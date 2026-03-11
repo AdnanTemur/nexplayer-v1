@@ -1,0 +1,56 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# IDE files
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Qt
+*.qm
+*.autosave
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# macOS
+.DS_Store
+*.app/
+
+# Windows
+Thumbs.db
+*.pdb
+
+# Temporary files
+*~
+*.swp
+*.swo
+*.tmp
+
+# JUCE (if added)
+external/JUCE/
+
+# User data
+*.log
+config.ini
