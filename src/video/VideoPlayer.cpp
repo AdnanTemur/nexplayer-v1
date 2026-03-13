@@ -5,6 +5,7 @@
 #include "../audio/EffectChain.h"
 #include <QImage>
 #include <QDebug>
+#include <algorithm> 
 
 VideoPlayer::VideoPlayer(QObject *parent)
     : QObject(parent), m_videoDecoder(std::make_unique<VideoDecoder>()), m_audioDecoder(std::make_unique<AudioDecoder>()), m_audioOutput(std::make_unique<AudioOutput>()), m_effectChain(std::make_unique<EffectChain>()), m_frameTimer(new QTimer(this))
