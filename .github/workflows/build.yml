@@ -1,0 +1,107 @@
+name: Build NexPlayer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install dependencies
+        run: |
+          brew install qt ffmpeg cmake
+      
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt ..
+          make -j$(sysctl -n hw.ncpu)
+      
+      - name: Deploy
+        run: |
+          chmod +x scripts/deploy_macos.sh
+          ./scripts/deploy_macos.sh
+      
+      - name: Create DMG
+        run: |
+          chmod +x scripts/create_dmg.sh
+          ./scripts/create_dmg.sh
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NexPlayer-macOS
+          path: build/*.dmg
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y qt6-base-dev qt6-declarative-dev \
+            libavcodec-dev libavformat-dev libavutil-dev \
+            libswresample-dev libswscale-dev cmake build-essential
+      
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make -j$(nproc)
+      
+      - name: Create AppImage
+        run: |
+          chmod +x scripts/create_appimage.sh
+          ./scripts/create_appimage.sh
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NexPlayer-Linux
+          path: build/*.AppImage
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          arch: 'win64_msvc2019_64'
+      
+      - name: Install FFmpeg
+        run: |
+          choco install ffmpeg
+      
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A x64 ..
+          cmake --build . --config Release
+      
+      - name: Deploy
+        run: |
+          windeployqt build/Release/NexPlayer.exe --qmldir qml
+      
+      - name: Create Installer
+        run: |
+          choco install innosetup
+          iscc scripts/installer.iss
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NexPlayer-Windows
+          path: build/NexPlayer-*-Setup.exe

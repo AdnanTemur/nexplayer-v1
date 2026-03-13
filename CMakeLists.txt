@@ -7,6 +7,28 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+if(APPLE)
+    # Clear any cached Qt paths
+    unset(Qt6_DIR CACHE)
+    unset(CMAKE_PREFIX_PATH CACHE)
+    
+    # Detect Homebrew prefix (Intel vs Apple Silicon)
+    execute_process(
+        COMMAND brew --prefix qt@6
+        OUTPUT_VARIABLE HOMEBREW_QT_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    if(HOMEBREW_QT_PREFIX)
+        set(CMAKE_PREFIX_PATH "${HOMEBREW_QT_PREFIX}")
+        set(Qt6_DIR "${HOMEBREW_QT_PREFIX}/lib/cmake/Qt6")
+        
+        message(STATUS "🍺 Using Homebrew Qt: ${HOMEBREW_QT_PREFIX}")
+    else()
+        message(FATAL_ERROR "❌ Homebrew Qt not found! Install with: brew install qt@6")
+    endif()
+endif()
+
 # Hot Reload option for development
 option(QML_HOT_RELOAD "Enable QML hot reload (development mode)" OFF)
 
