@@ -58,13 +58,43 @@ jobs:
           cmake ..
           make -j$(nproc)
 
+      - name: Create desktop file
+        run: |
+          mkdir -p AppDir/usr/share/applications
+          cat > AppDir/usr/share/applications/nexplayer.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=NexPlayer
+          Comment=Modern media player with audio effects
+          Exec=NexPlayer
+          Icon=nexplayer
+          Categories=AudioVideo;Player;
+          Terminal=false
+          EOF
+
+      - name: Create icon (placeholder)
+        run: |
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          # Create a simple placeholder icon using ImageMagick
+          sudo apt install -y imagemagick
+          convert -size 256x256 xc:transparent \
+            -fill "#10b981" -draw "circle 128,128 128,64" \
+            -fill white -pointsize 60 -gravity center -annotate +0+0 "NP" \
+            AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png
+
       - name: Create AppImage
         run: |
           wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           export QMAKE=/usr/lib/qt6/bin/qmake
-          ./linuxdeploy-x86_64.AppImage --executable=build/NexPlayer --appdir=AppDir --plugin=qt --output=appimage
+          ./linuxdeploy-x86_64.AppImage \
+            --executable=build/NexPlayer \
+            --desktop-file=AppDir/usr/share/applications/nexplayer.desktop \
+            --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png \
+            --appdir=AppDir \
+            --plugin=qt \
+            --output=appimage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -84,34 +114,43 @@ jobs:
           arch: "win64_msvc2019_64"
           modules: "qtmultimedia"
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+      - name: Setup vcpkg cache
+        uses: actions/cache@v3
         with:
-          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+          path: |
+            C:\vcpkg\downloads
+            C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
 
-      - name: Install FFmpeg via vcpkg
+      - name: Install FFmpeg (simple method)
         run: |
-          vcpkg install ffmpeg[core]:x64-windows
+          choco install ffmpeg-shared --version=7.1.0
+
+      - name: Setup pkg-config
+        run: |
+          choco install pkgconfiglite
 
       - name: Build
         run: |
+          $env:PKG_CONFIG_PATH = "C:\ProgramData\chocolatey\lib\ffmpeg-shared\tools\ffmpeg\lib\pkgconfig"
           mkdir build
           cd build
-          cmake -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake `
-            ..
+          cmake -G "Visual Studio 17 2022" -A x64 ..
           cmake --build . --config Release
 
       - name: Deploy
         run: |
           cd build/Release
-          $env:PATH = "$env:Qt6_DIR/bin;$env:PATH"
           windeployqt NexPlayer.exe --qmldir ../../qml
-          # Copy FFmpeg DLLs
-          Copy-Item "$env:VCPKG_ROOT/installed/x64-windows/bin/*.dll" -Destination . -ErrorAction SilentlyContinue
+          Copy-Item "C:\ProgramData\chocolatey\lib\ffmpeg-shared\tools\ffmpeg\bin\*.dll" -Destination .
+
+      - name: Create ZIP
+        run: |
+          cd build/Release
+          Compress-Archive -Path * -DestinationPath ../../NexPlayer-Windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NexPlayer-Windows
-          path: build/Release/
+          path: NexPlayer-Windows.zip
