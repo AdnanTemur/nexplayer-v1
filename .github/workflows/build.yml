@@ -72,10 +72,10 @@ jobs:
           name: NexPlayer-Linux
           path: NexPlayer-*.AppImage
 
-  build-windows:  
-    runs-on: windows-latest  
-    steps:  
-      - uses: actions/checkout@v4  
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
@@ -84,24 +84,34 @@ jobs:
           arch: "win64_msvc2019_64"
           modules: "qtmultimedia"
 
-      - name: Install FFmpeg
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+
+      - name: Install FFmpeg via vcpkg
         run: |
-          choco install ffmpeg
+          vcpkg install ffmpeg[core]:x64-windows
 
       - name: Build
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 17 2022" -A x64 ..
+          cmake -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake `
+            ..
           cmake --build . --config Release
 
       - name: Deploy
         run: |
           cd build/Release
+          $env:PATH = "$env:Qt6_DIR/bin;$env:PATH"
           windeployqt NexPlayer.exe --qmldir ../../qml
+          # Copy FFmpeg DLLs
+          Copy-Item "$env:VCPKG_ROOT/installed/x64-windows/bin/*.dll" -Destination . -ErrorAction SilentlyContinue
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NexPlayer-Windows
-          path: build/Release/NexPlayer.exe
+          path: build/Release/

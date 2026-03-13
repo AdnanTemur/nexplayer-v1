@@ -1,5 +1,6 @@
 #include "ReverbEffect.h"
 #include <cmath>
+#include <algorithm> 
 
 // Comb filter delays (samples at 44.1kHz)
 static const int combTunings[8] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
