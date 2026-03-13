@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include "EffectChain.h"
+#include <algorithm>  
 #include <iostream>
 
 AudioEngine::AudioEngine()

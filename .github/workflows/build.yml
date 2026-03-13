@@ -2,40 +2,40 @@ name: Build NexPlayer
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ created ]
+    types: [created]
 
 jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4  # Also update checkout to v4
-      
+      - uses: actions/checkout@v4 # Also update checkout to v4
+
       - name: Install dependencies
         run: |
           brew install qt ffmpeg cmake
-      
+
       - name: Build
         run: |
           mkdir build && cd build
           cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
           make -j$(sysctl -n hw.ncpu)
-      
+
       - name: Deploy
         run: |
           chmod +x scripts/deploy_macos.sh
           ./scripts/deploy_macos.sh
-      
+
       - name: Create DMG
         run: |
           chmod +x scripts/create_dmg.sh
           ./scripts/create_dmg.sh
-      
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4  # ← Changed from v3
+        uses: actions/upload-artifact@v4 # ← Changed from v3
         with:
           name: NexPlayer-macOS
           path: build/*.dmg
@@ -43,21 +43,21 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # ← Changed from v3
-      
+      - uses: actions/checkout@v4 # ← Changed from v3
+
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y qt6-base-dev qt6-declarative-dev qt6-multimedia-dev \
             libavcodec-dev libavformat-dev libavutil-dev \
             libswresample-dev libswscale-dev cmake build-essential
-      
+
       - name: Build
         run: |
           mkdir build && cd build
           cmake ..
           make -j$(nproc)
-      
+
       - name: Create AppImage
         run: |
           wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -65,42 +65,43 @@ jobs:
           chmod +x linuxdeploy*.AppImage
           export QMAKE=/usr/lib/qt6/bin/qmake
           ./linuxdeploy-x86_64.AppImage --executable=build/NexPlayer --appdir=AppDir --plugin=qt --output=appimage
-      
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4  # ← Changed from v3
+        uses: actions/upload-artifact@v4 # ← Changed from v3
         with:
           name: NexPlayer-Linux
           path: NexPlayer-*.AppImage
 
   build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4  # ← Changed from v3
-      
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: '6.5.0'
-          arch: 'win64_msvc2019_64'
-      
-      - name: Install FFmpeg
-        run: |
-          choco install ffmpeg
-      
-      - name: Build
-        run: |
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -A x64 ..
-          cmake --build . --config Release
-      
-      - name: Deploy
-        run: |
-          cd build/Release
-          windeployqt NexPlayer.exe --qmldir ../../qml
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4  # ← Changed from v3
-        with:
-          name: NexPlayer-Windows
-          path: build/Release/NexPlayer.exe
+  runs-on: windows-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: "6.5.0"
+        arch: "win64_msvc2019_64"
+        modules: "qtmultimedia" # ← ADD THIS
+
+    - name: Install FFmpeg
+      run: |
+        choco install ffmpeg
+
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 ..
+        cmake --build . --config Release
+
+    - name: Deploy
+      run: |
+        cd build/Release
+        windeployqt NexPlayer.exe --qmldir ../../qml
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NexPlayer-Windows
+        path: build/Release/NexPlayer.exe
