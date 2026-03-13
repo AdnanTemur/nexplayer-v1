@@ -12,7 +12,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # Also update checkout to v4
       
       - name: Install dependencies
         run: |
@@ -21,7 +21,7 @@ jobs:
       - name: Build
         run: |
           mkdir build && cd build
-          cmake -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt ..
+          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
           make -j$(sysctl -n hw.ncpu)
       
       - name: Deploy
@@ -35,7 +35,7 @@ jobs:
           ./scripts/create_dmg.sh
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # ← Changed from v3
         with:
           name: NexPlayer-macOS
           path: build/*.dmg
@@ -43,12 +43,12 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # ← Changed from v3
       
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y qt6-base-dev qt6-declarative-dev \
+          sudo apt install -y qt6-base-dev qt6-declarative-dev qt6-multimedia-dev \
             libavcodec-dev libavformat-dev libavutil-dev \
             libswresample-dev libswscale-dev cmake build-essential
       
@@ -60,19 +60,22 @@ jobs:
       
       - name: Create AppImage
         run: |
-          chmod +x scripts/create_appimage.sh
-          ./scripts/create_appimage.sh
+          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          export QMAKE=/usr/lib/qt6/bin/qmake
+          ./linuxdeploy-x86_64.AppImage --executable=build/NexPlayer --appdir=AppDir --plugin=qt --output=appimage
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # ← Changed from v3
         with:
           name: NexPlayer-Linux
-          path: build/*.AppImage
+          path: NexPlayer-*.AppImage
 
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # ← Changed from v3
       
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
@@ -93,15 +96,11 @@ jobs:
       
       - name: Deploy
         run: |
-          windeployqt build/Release/NexPlayer.exe --qmldir qml
-      
-      - name: Create Installer
-        run: |
-          choco install innosetup
-          iscc scripts/installer.iss
+          cd build/Release
+          windeployqt NexPlayer.exe --qmldir ../../qml
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # ← Changed from v3
         with:
           name: NexPlayer-Windows
-          path: build/NexPlayer-*-Setup.exe
+          path: build/Release/NexPlayer.exe
