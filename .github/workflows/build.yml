@@ -116,15 +116,12 @@ jobs:
 
       - name: Download FFmpeg
         run: |
-          # Download pre-built FFmpeg (trusted source)
           Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile "ffmpeg.zip"
           Expand-Archive -Path ffmpeg.zip -DestinationPath .
           Rename-Item -Path "ffmpeg-master-latest-win64-gpl-shared" -NewName "ffmpeg"
           
-          # Create pkg-config files
           New-Item -ItemType Directory -Force -Path "ffmpeg/lib/pkgconfig"
           
-          # Create minimal pkg-config files for FFmpeg
           @"
           prefix=${{ github.workspace }}/ffmpeg
           exec_prefix=`${prefix}
@@ -204,8 +201,8 @@ jobs:
       - name: Deploy
         run: |
           cd build/Release
-          # Deploy Qt
-          windeployqt NexPlayer.exe --qmldir ../../qml
+          # Deploy Qt (skip translations to avoid errors)
+          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations
           # Copy FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" -Destination .
 
