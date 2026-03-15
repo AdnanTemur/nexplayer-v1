@@ -100,16 +100,33 @@ jobs:
           wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           
-          # Set Qt paths explicitly
+          # Find Qt QML path
+          QML_PATH=$(find /usr/lib -type d -name "qml" -path "*/qt6/*" 2>/dev/null | head -1)
+          echo "=== Qt QML path: $QML_PATH ==="
+          
+          # List what's actually available
+          echo "=== Available QML modules ==="
+          ls -la "$QML_PATH" || echo "No QML modules found"
+          
+          # Check if WorkerScript exists
+          echo "=== Checking for WorkerScript ==="
+          find /usr -name "*WorkerScript*" 2>/dev/null || echo "WorkerScript not found on system"
+          
+          # Manually copy ALL Qt QML modules
+          echo "=== Copying Qt QML modules to AppDir ==="
+          mkdir -p AppDir/usr/lib/qt6/qml
+          if [ -d "$QML_PATH" ]; then
+            cp -r "$QML_PATH"/* AppDir/usr/lib/qt6/qml/
+            echo "Copied QML modules"
+            ls -la AppDir/usr/lib/qt6/qml/
+          fi
+          
+          # Verify QtQml.WorkerScript is in AppDir
+          echo "=== Verifying WorkerScript in AppDir ==="
+          find AppDir -name "*WorkerScript*" || echo "WorkerScript NOT in AppDir before linuxdeploy"
+          
           export QML_SOURCES_PATHS="$(pwd)/qml"
           export QMAKE=/usr/lib/qt6/bin/qmake
-          export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-          
-          # Copy Qt QML modules to ensure they're included
-          mkdir -p AppDir/usr/lib/qt6/qml
-          cp -r /usr/lib/qt6/qml/QtQml AppDir/usr/lib/qt6/qml/ || true
-          cp -r /usr/lib/qt6/qml/QtQuick AppDir/usr/lib/qt6/qml/ || true
-          cp -r /usr/lib/qt6/qml/Qt5Compat AppDir/usr/lib/qt6/qml/ || true
           
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
@@ -118,6 +135,11 @@ jobs:
             --appdir=AppDir \
             --plugin=qt \
             --output=appimage
+          
+          # Final check
+          echo "=== Final check in AppImage ==="
+          ./linuxdeploy-x86_64.AppImage --appimage-extract
+          find squashfs-root -name "*WorkerScript*" || echo "WorkerScript MISSING in final AppImage"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
