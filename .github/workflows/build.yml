@@ -94,39 +94,21 @@ jobs:
           # Copy your actual icon instead of generating one
           cp resources/icon.png AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png
 
+      - name: Create AppRun wrapper
+        run: |
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          APPDIR="$(dirname "$(readlink -f "$0")")"
+          export QML2_IMPORT_PATH="$APPDIR/usr/lib/qt6/qml:$APPDIR/usr/qml"
+          export QML_IMPORT_PATH="$APPDIR/usr/lib/qt6/qml:$APPDIR/usr/qml"
+          export LD_LIBRARY_PATH="$APPDIR/usr/lib:$LD_LIBRARY_PATH"
+          exec "$APPDIR/usr/bin/NexPlayer" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
       - name: Create AppImage
         run: |
-          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod +x linuxdeploy*.AppImage
-          
-          # Find Qt QML path
-          QML_PATH=$(find /usr/lib -type d -name "qml" -path "*/qt6/*" 2>/dev/null | head -1)
-          echo "=== Qt QML path: $QML_PATH ==="
-          
-          # List what's actually available
-          echo "=== Available QML modules ==="
-          ls -la "$QML_PATH" || echo "No QML modules found"
-          
-          # Check if WorkerScript exists
-          echo "=== Checking for WorkerScript ==="
-          find /usr -name "*WorkerScript*" 2>/dev/null || echo "WorkerScript not found on system"
-          
-          # Manually copy ALL Qt QML modules
-          echo "=== Copying Qt QML modules to AppDir ==="
-          mkdir -p AppDir/usr/lib/qt6/qml
-          if [ -d "$QML_PATH" ]; then
-            cp -r "$QML_PATH"/* AppDir/usr/lib/qt6/qml/
-            echo "Copied QML modules"
-            ls -la AppDir/usr/lib/qt6/qml/
-          fi
-          
-          # Verify QtQml.WorkerScript is in AppDir
-          echo "=== Verifying WorkerScript in AppDir ==="
-          find AppDir -name "*WorkerScript*" || echo "WorkerScript NOT in AppDir before linuxdeploy"
-          
-          export QML_SOURCES_PATHS="$(pwd)/qml"
-          export QMAKE=/usr/lib/qt6/bin/qmake
+          # ... (keep all the previous code until linuxdeploy runs)
           
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
@@ -136,10 +118,17 @@ jobs:
             --plugin=qt \
             --output=appimage
           
-          # Final check
-          echo "=== Final check in AppImage ==="
-          ./linuxdeploy-x86_64.AppImage --appimage-extract
-          find squashfs-root -name "*WorkerScript*" || echo "WorkerScript MISSING in final AppImage"
+          # Extract and verify final AppImage contents
+          echo "=== Extracting AppImage to verify contents ==="
+          chmod +x NexPlayer-*.AppImage
+          ./NexPlayer-*.AppImage --appimage-extract
+          
+          echo "=== Checking for WorkerScript in final AppImage ==="
+          find squashfs-root -name "*WorkerScript*" -type d
+          find squashfs-root -name "*WorkerScript*" -type f
+          
+          echo "=== QML modules in final AppImage ==="
+          ls -la squashfs-root/usr/lib/qt6/qml/ || ls -la squashfs-root/usr/qml/ || echo "No QML directory found"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
