@@ -222,9 +222,9 @@ jobs:
           
           $qtDir = "$env:Qt6_DIR"
           
-          # Copy ALL Qt6 DLLs (easier than finding each one)
-          Write-Host "Copying all Qt6 DLLs..."
-          Copy-Item "$qtDir\bin\Qt6*.dll" . -Force
+          # Copy ALL DLLs from Qt bin folder (includes dependencies)
+          Write-Host "Copying all Qt DLLs and dependencies..."
+          Copy-Item "$qtDir\bin\*.dll" . -Force
           
           # Run windeployqt
           windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release 2>&1 | Out-Null
