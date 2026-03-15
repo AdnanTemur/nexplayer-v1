@@ -48,9 +48,23 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y qt6-base-dev qt6-declarative-dev qt6-multimedia-dev \
-            libavcodec-dev libavformat-dev libavutil-dev \
-            libswresample-dev libswscale-dev cmake build-essential
+          sudo apt install -y \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-multimedia-dev \
+            qt6-5compat-dev \
+            libqt6opengl6-dev \
+            qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts \
+            qml6-module-qtquick-window \
+            qml6-module-qt5compat-graphicaleffects \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswresample-dev \
+            libswscale-dev \
+            cmake \
+            build-essential
 
       - name: Build
         run: |
@@ -72,10 +86,9 @@ jobs:
           Terminal=false
           EOF
 
-      - name: Create icon (placeholder)
+      - name: Create icon
         run: |
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          # Create a simple placeholder icon using ImageMagick
           sudo apt install -y imagemagick
           convert -size 256x256 xc:transparent \
             -fill "#10b981" -draw "circle 128,128 128,64" \
@@ -87,7 +100,10 @@ jobs:
           wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
+          
+          export QML_SOURCES_PATHS=qml
           export QMAKE=/usr/lib/qt6/bin/qmake
+          
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
             --desktop-file=AppDir/usr/share/applications/nexplayer.desktop \
@@ -199,12 +215,35 @@ jobs:
           cmake --build . --config Release
 
       - name: Deploy
-        run: |
-          cd build/Release
-          # Deploy Qt (skip translations to avoid errors)
-          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations
-          # Copy FFmpeg DLLs
-          Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" -Destination .
+            run: |
+              cd build/Release
+              
+              $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+              windeployqt NexPlayer.exe `
+                --qmldir ../../qml `
+                --qmlimport ../../qml `
+                --no-translations `
+                --release `
+                --compiler-runtime
+              
+              $requiredFiles = @(
+                "platforms\qwindows.dll",
+                "qml\QtQuick\Controls\qmldir",
+                "qml\QtQuick\Layouts\qmldir",
+                "qml\Qt5Compat\GraphicalEffects\qmldir"
+              )
+              
+              foreach ($file in $requiredFiles) {
+                if (-not (Test-Path $file)) {
+                  Write-Error "Missing: $file"
+                  exit 1
+                }
+              }
+              
+              Write-Host "Copying FFmpeg DLLs..."
+              Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" -Destination . -Force
+              
+              Write-Host "`nDeployment successful!"
 
       - name: Create ZIP
         run: |
