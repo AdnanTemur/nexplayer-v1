@@ -222,8 +222,7 @@ jobs:
           
           $qtDir = "$env:Qt6_DIR"
           
-          # Copy ALL DLLs from Qt bin folder (includes dependencies)
-          Write-Host "Copying all Qt DLLs and dependencies..."
+          # Copy ALL DLLs from Qt bin
           Copy-Item "$qtDir\bin\*.dll" . -Force
           
           # Run windeployqt
@@ -237,19 +236,9 @@ jobs:
           New-Item -ItemType Directory -Force imageformats | Out-Null
           Copy-Item "$qtDir\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
           
-          # QML modules with robocopy
-          if (Test-Path "$qtDir\qml\QtQuick") {
-            robocopy "$qtDir\qml\QtQuick" "qml\QtQuick" /E /NFL /NDL /NJH /NJS /NC /NS /NP
-          }
-          if (Test-Path "$qtDir\qml\Qt5Compat") {
-            robocopy "$qtDir\qml\Qt5Compat" "qml\Qt5Compat" /E /NFL /NDL /NJH /NJS /NC /NS /NP
-          }
-          if (Test-Path "$qtDir\qml\QtQml") {
-            robocopy "$qtDir\qml\QtQml" "qml\QtQml" /E /NFL /NDL /NJH /NJS /NC /NS /NP
-          }
-          if (Test-Path "$qtDir\qml\QtMultimedia") {
-            robocopy "$qtDir\qml\QtMultimedia" "qml\QtMultimedia" /E /NFL /NDL /NJH /NJS /NC /NS /NP
-          }
+          # QML modules - copy EVERYTHING
+          New-Item -ItemType Directory -Force qml | Out-Null
+          Copy-Item -Recurse -Force "$qtDir\qml\*" "qml\" -ErrorAction SilentlyContinue
           
           # FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
