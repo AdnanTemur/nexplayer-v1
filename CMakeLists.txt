@@ -125,7 +125,7 @@ if(WIN32)
     set(APP_ICON_RC "${CMAKE_CURRENT_SOURCE_DIR}/resources/app_icon.rc")
     
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        WIN32_EXECUTABLE TRUE
+        WIN32_EXECUTABLE FALSE
     )
     
     # Add icon to executable
