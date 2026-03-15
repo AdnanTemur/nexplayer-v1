@@ -222,36 +222,9 @@ jobs:
           
           $qtDir = "$env:Qt6_DIR"
           
-          # Copy essential Qt DLLs manually
-          Write-Host "Copying Qt DLLs..."
-          $qtDlls = @(
-            "Qt6Core.dll",
-            "Qt6Gui.dll",
-            "Qt6Qml.dll",
-            "Qt6QmlModels.dll",
-            "Qt6QmlWorkerScript.dll",
-            "Qt6Quick.dll",
-            "Qt6QuickEffects.dll",
-            "Qt6QuickControls2.dll",
-            "Qt6QuickControls2Impl.dll",
-            "Qt6QuickLayouts.dll",
-            "Qt6QuickTemplates2.dll",
-            "Qt6Multimedia.dll",
-            "Qt6MultimediaQuick.dll",
-            "Qt6Network.dll",
-            "Qt6OpenGL.dll",
-            "Qt6Widgets.dll",
-            "Qt6Svg.dll",
-            "Qt6Core5Compat.dll",
-            "Qt6SvgWidgets.dll"
-          )
-          
-          foreach ($dll in $qtDlls) {
-            $sourcePath = "$qtDir\bin\$dll"
-            if (Test-Path $sourcePath) {
-              Copy-Item $sourcePath . -Force
-            }
-          }
+          # Copy ALL Qt6 DLLs (easier than finding each one)
+          Write-Host "Copying all Qt6 DLLs..."
+          Copy-Item "$qtDir\bin\Qt6*.dll" . -Force
           
           # Run windeployqt
           windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release 2>&1 | Out-Null
