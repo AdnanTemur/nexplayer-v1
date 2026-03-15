@@ -121,15 +121,29 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 # Platform-specific settings
 if(WIN32)
+    # Windows icon resource
+    set(APP_ICON_RC "${CMAKE_CURRENT_SOURCE_DIR}/resources/app_icon.rc")
+    
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
+    
+    # Add icon to executable
+    target_sources(${PROJECT_NAME} PRIVATE ${APP_ICON_RC})
+    
 elseif(APPLE)
+    # macOS icon
+    set(MACOSX_BUNDLE_ICON_FILE AppIcon.icns)
+    set(APP_ICON_MACOS ${CMAKE_CURRENT_SOURCE_DIR}/resources/AppIcon.icns)
+    set_source_files_properties(${APP_ICON_MACOS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    
     set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_GUI_IDENTIFIER com.nexylius.nexplayer
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+        MACOSX_BUNDLE_ICON_FILE AppIcon.icns
+        RESOURCE "${APP_ICON_MACOS}"
     )
 endif()
 
