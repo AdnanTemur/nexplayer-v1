@@ -220,28 +220,56 @@ jobs:
         run: |
           cd build/Release
           
-          # Run windeployqt - ignore exit code (ShaderTools warning is non-critical)
+          # Run windeployqt (ignore exit code - ShaderTools warning is non-critical)
           windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "windeployqt completed with warnings (non-critical)"
+          
+          # ALWAYS ensure platform plugin exists
+          New-Item -ItemType Directory -Force platforms | Out-Null
+          Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" platforms\ -Force
+          
+          # ALWAYS ensure imageformats exist
+          New-Item -ItemType Directory -Force imageformats | Out-Null
+          Copy-Item "$env:Qt6_DIR\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
+          
+          # ALWAYS copy QML modules (critical for app to run)
+          New-Item -ItemType Directory -Force qml | Out-Null
+          
+          if (Test-Path "$env:Qt6_DIR\qml\QtQuick") {
+            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtQuick" qml\
           }
           
-          # Manually ensure critical files are present
-          if (-not (Test-Path "platforms\qwindows.dll")) {
-            New-Item -ItemType Directory -Force platforms | Out-Null
-            Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" platforms\ -Force
+          if (Test-Path "$env:Qt6_DIR\qml\Qt5Compat") {
+            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\Qt5Compat" qml\
           }
           
-          if (-not (Test-Path "qml\QtQuick\Controls")) {
-            New-Item -ItemType Directory -Force qml | Out-Null
-            Copy-Item -Recurse "$env:Qt6_DIR\qml\QtQuick" qml\ -Force
-            Copy-Item -Recurse "$env:Qt6_DIR\qml\Qt5Compat" qml\ -Force
+          if (Test-Path "$env:Qt6_DIR\qml\QtQml") {
+            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtQml" qml\
+          }
+          
+          if (Test-Path "$env:Qt6_DIR\qml\QtMultimedia") {
+            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtMultimedia" qml\
           }
           
           # Copy FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
           
-          # Success!
+          # Verify critical files
+          if (-not (Test-Path "platforms\qwindows.dll")) {
+            Write-Error "Missing platform plugin!"
+            exit 1
+          }
+          
+          if (-not (Test-Path "qml\QtQuick\Controls\qmldir")) {
+            Write-Error "Missing QtQuick Controls!"
+            exit 1
+          }
+          
+          if (-not (Test-Path "qml\QtMultimedia\qmldir")) {
+            Write-Error "Missing QtMultimedia!"
+            exit 1
+          }
+          
+          Write-Host "Deployment successful"
           exit 0
         shell: pwsh
 
