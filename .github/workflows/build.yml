@@ -240,7 +240,6 @@ jobs:
           $qtDir = "$env:Qt6_DIR"
           $env:PATH = "$qtDir\bin;$env:PATH"
           
-          # Run windeployqt (best effort, ignore errors)
           Write-Host "Running windeployqt..."
           windeployqt NexPlayer.exe `
             --qmldir ../../qml `
@@ -250,7 +249,6 @@ jobs:
           
           Write-Host "`n📋 Ensuring platform plugin exists..."
           
-          # Manually copy platform plugins
           New-Item -ItemType Directory -Force -Path "platforms" | Out-Null
           Copy-Item "$qtDir\plugins\platforms\qwindows.dll" -Destination "platforms\" -Force
           Copy-Item "$qtDir\plugins\platforms\qminimal.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
@@ -262,112 +260,50 @@ jobs:
           }
           Write-Host "✅ Platform plugin confirmed"
           
-          # Manually copy image format plugins
           Write-Host "`nCopying image format plugins..."
           New-Item -ItemType Directory -Force -Path "imageformats" | Out-Null
           Copy-Item "$qtDir\plugins\imageformats\*.dll" -Destination "imageformats\" -Force -ErrorAction SilentlyContinue
           
-          # Manually copy QML modules
           Write-Host "`nCopying QML modules..."
           New-Item -ItemType Directory -Force -Path "qml" | Out-Null
           
-          # Copy QtQuick
           if (Test-Path "$qtDir\qml\QtQuick") {
             Copy-Item -Recurse -Force "$qtDir\qml\QtQuick" -Destination "qml\" -ErrorAction SilentlyContinue
             Write-Host "✅ Copied QtQuick"
           }
           
-          # Copy Qt5Compat
           if (Test-Path "$qtDir\qml\Qt5Compat") {
             Copy-Item -Recurse -Force "$qtDir\qml\Qt5Compat" -Destination "qml\" -ErrorAction SilentlyContinue
             Write-Host "✅ Copied Qt5Compat"
           }
           
-          # Copy QtQml
           if (Test-Path "$qtDir\qml\QtQml") {
             Copy-Item -Recurse -Force "$qtDir\qml\QtQml" -Destination "qml\" -ErrorAction SilentlyContinue
             Write-Host "✅ Copied QtQml"
           }
           
-          # Copy QtMultimedia
           if (Test-Path "$qtDir\qml\QtMultimedia") {
             Copy-Item -Recurse -Force "$qtDir\qml\QtMultimedia" -Destination "qml\" -ErrorAction SilentlyContinue
             Write-Host "✅ Copied QtMultimedia"
           }
           
-          # Verify QML modules
-          Write-Host "`nVerifying QML modules..."
-          $qmlModules = @(
-            "qml\QtQuick\Controls",
-            "qml\QtQuick\Layouts"
-          )
-          
-          $allFound = $true
-          foreach ($module in $qmlModules) {
-            if (Test-Path "$module\qmldir") {
-              Write-Host "✅ QML module: $module"
-            } else {
-              Write-Warning "⚠️  Missing QML module: $module"
-              $allFound = $false
-            }
-          }
-          
-          if (-not $allFound) {
-            Write-Host "`nAvailable QML modules in Qt:"
-            Get-ChildItem "$qtDir\qml" -Directory | Select-Object Name
-          }
-          
-          # Copy FFmpeg DLLs
           Write-Host "`n📦 Copying FFmpeg DLLs..."
           $ffmpegBin = "${{ github.workspace }}/ffmpeg/bin"
           Copy-Item "$ffmpegBin\*.dll" -Destination . -Force
-          
-          # Summary
-          Write-Host "`n📊 Deployment summary:"
-          Write-Host "`nQt DLLs:"
-          Get-ChildItem Qt6*.dll | Select-Object Name
-          
-          Write-Host "`nFFmpeg DLLs:"
-          Get-ChildItem av*.dll,sw*.dll | Select-Object Name
-          
-          Write-Host "`nPlatform plugins:"
-          Get-ChildItem platforms\*.dll | Select-Object Name
-          
-          Write-Host "`nQML modules:"
-          Get-ChildItem qml -Directory -ErrorAction SilentlyContinue | Select-Object Name
           
           Write-Host "`n✅ Deployment complete"
 
       - name: Create Release Package
         run: |
           cd build/Release
-          
-          Write-Host "📦 Creating package folder..."
-          $pkg = "NexPlayer-1.0.0-Windows"
-          
-          if (Test-Path $pkg) { Remove-Item -Recurse -Force $pkg }
-          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-          
-          Write-Host "Copying files..."
-          Copy-Item "NexPlayer.exe" -Destination $pkg -Force
-          Copy-Item "*.dll" -Destination $pkg -Force
-          
-          if (Test-Path "platforms") { Copy-Item -Recurse "platforms" -Destination $pkg -Force }
-          if (Test-Path "qml") { Copy-Item -Recurse "qml" -Destination $pkg -Force }
-          if (Test-Path "imageformats") { Copy-Item -Recurse "imageformats" -Destination $pkg -Force }
-          
-          Write-Host "Creating README..."
-          "NexPlayer v1.0.0 for Windows`n`nEXTRACT ALL FILES AND RUN NexPlayer.exe`n`nSOURCE: https://github.com/yourusername/NexPlayer-V1" | Out-File "$pkg\README.txt"
-          
-          Write-Host "Creating ZIP..."
-          Compress-Archive -Path $pkg -DestinationPath "..\..\NexPlayer-Windows.zip" -Force
-          
-          if (Test-Path "..\..\NexPlayer-Windows.zip") {
-            Write-Host "✅ Success!"
-          } else {
-            throw "ZIP not created"
-          }
-        shell: pwsh
+          New-Item -ItemType Directory -Force NexPlayer-Windows
+          Copy-Item NexPlayer.exe NexPlayer-Windows/
+          Copy-Item *.dll NexPlayer-Windows/
+          Copy-Item -Recurse platforms NexPlayer-Windows/
+          Copy-Item -Recurse qml NexPlayer-Windows/
+          if (Test-Path imageformats) { Copy-Item -Recurse imageformats NexPlayer-Windows/ }
+          Compress-Archive NexPlayer-Windows ../../NexPlayer-Windows.zip -Force
+          Write-Host "✅ ZIP created"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
