@@ -239,22 +239,43 @@ jobs:
           
           $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
           
+          # Run windeployqt (ignore ShaderTools warning)
           windeployqt NexPlayer.exe `
             --qmldir ../../qml `
             --qmlimport ../../qml `
             --no-translations `
             --release `
-            --compiler-runtime `
-            --verbose 1
+            --compiler-runtime 2>&1 | Out-String | Write-Host
           
-          Write-Host "`n📋 Verifying critical files..."
+          Write-Host "`n📋 Ensuring platform plugin exists..."
+          
+          # Manually copy platform plugin if missing
+          if (-not (Test-Path "platforms\qwindows.dll")) {
+            Write-Host "Platform plugin not deployed, copying manually..."
+            New-Item -ItemType Directory -Force -Path "platforms" | Out-Null
+            Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" -Destination "platforms\" -Force
+            Copy-Item "$env:Qt6_DIR\plugins\platforms\qminimal.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
+            Copy-Item "$env:Qt6_DIR\plugins\platforms\qoffscreen.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
+          }
           
           if (-not (Test-Path "platforms\qwindows.dll")) {
-            Write-Error "❌ Missing platform plugin: platforms\qwindows.dll"
+            Write-Error "❌ Still missing platform plugin!"
             exit 1
           }
-          Write-Host "✅ Platform plugin found"
+          Write-Host "✅ Platform plugin confirmed"
           
+          # Manually copy image format plugins
+          Write-Host "`nCopying image format plugins..."
+          New-Item -ItemType Directory -Force -Path "imageformats" | Out-Null
+          Copy-Item "$env:Qt6_DIR\plugins\imageformats\*.dll" -Destination "imageformats\" -Force -ErrorAction SilentlyContinue
+          
+          # Manually copy styles
+          Write-Host "Copying Qt styles..."
+          New-Item -ItemType Directory -Force -Path "styles" | Out-Null
+          Copy-Item "$env:Qt6_DIR\plugins\styles\*.dll" -Destination "styles\" -Force -ErrorAction SilentlyContinue
+          
+          # Check QML modules
+          Write-Host "`nChecking QML modules..."
           $qmlModules = @(
             "qml\QtQuick\Controls",
             "qml\QtQuick\Layouts"
@@ -270,12 +291,14 @@ jobs:
           
           Write-Host "`n📦 Copying FFmpeg DLLs..."
           $ffmpegBin = "${{ github.workspace }}/ffmpeg/bin"
-          
           Copy-Item "$ffmpegBin\*.dll" -Destination . -Force
           
           Write-Host "`n📊 Deployment summary:"
-          Write-Host "DLLs in Release folder:"
-          Get-ChildItem *.dll | Select-Object Name, @{Name="Size";Expression={"{0:N2} MB" -f ($_.Length / 1MB)}} | Format-Table
+          Write-Host "Main DLLs:"
+          Get-ChildItem *.dll | Select-Object Name -First 10
+          
+          Write-Host "`nPlatform plugins:"
+          Get-ChildItem platforms\*.dll | Select-Object Name
           
           Write-Host "`n✅ Deployment complete"
 
