@@ -128,7 +128,7 @@ jobs:
         with:
           version: "6.5.0"
           arch: "win64_msvc2019_64"
-          modules: "qtmultimedia qt5compat"
+          modules: "qtmultimedia qt5compat qtshadertools"
 
       - name: Download FFmpeg
         run: |
@@ -221,18 +221,17 @@ jobs:
           cd build/Release
           
           $qtDir = "$env:Qt6_DIR"
-          $env:PATH = "$qtDir\bin;$env:PATH"
           
-          # Let windeployqt do its job - don't suppress output
-          windeployqt NexPlayer.exe --qmldir ../../qml --release --compiler-runtime
+          # Run windeployqt
+          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release
           
-          # Only add FFmpeg (windeployqt doesn't know about it)
+          # Copy FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
           
-          # Add d3dcompiler_47.dll for graphics effects
-          Copy-Item "C:\Windows\System32\d3dcompiler_47.dll" . -Force
-          
-          exit 0
+          # Copy d3dcompiler for shader effects
+          if (Test-Path "C:\Windows\System32\d3dcompiler_47.dll") {
+            Copy-Item "C:\Windows\System32\d3dcompiler_47.dll" . -Force
+          }
         shell: pwsh
 
       - name: Create ZIP
