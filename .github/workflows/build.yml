@@ -237,39 +237,23 @@ jobs:
           cd build/Release
           
           $qtDir = "$env:Qt6_DIR"
-          Write-Host "Qt directory: $qtDir"
           
-          # Check if Qt paths exist
-          Write-Host "`nChecking Qt paths..."
-          Write-Host "Platform plugins exist: $(Test-Path "$qtDir\plugins\platforms\qwindows.dll")"
-          Write-Host "QtQuick QML exists: $(Test-Path "$qtDir\qml\QtQuick")"
-          Write-Host "Qt5Compat QML exists: $(Test-Path "$qtDir\qml\Qt5Compat")"
+          # Run windeployqt without hiding output
+          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release
           
-          # Run windeployqt
-          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release --compiler-runtime
-          
-          # Manually copy platform plugin if missing
+          # Manually ensure critical files
           if (-not (Test-Path "platforms\qwindows.dll")) {
-            Write-Host "Copying platform plugin manually..."
             New-Item -ItemType Directory -Force platforms | Out-Null
-            Copy-Item "$qtDir\plugins\platforms\qwindows.dll" platforms\
+            Copy-Item "$qtDir\plugins\platforms\qwindows.dll" platforms\ -Force
           }
           
-          # Manually copy QML if missing
           if (-not (Test-Path "qml\QtQuick\Controls")) {
-            Write-Host "Copying QML modules manually..."
             New-Item -ItemType Directory -Force qml | Out-Null
-            if (Test-Path "$qtDir\qml\QtQuick") {
-              Copy-Item -Recurse "$qtDir\qml\QtQuick" qml\
-            }
-            if (Test-Path "$qtDir\qml\Qt5Compat") {
-              Copy-Item -Recurse "$qtDir\qml\Qt5Compat" qml\
-            }
+            Copy-Item -Recurse "$qtDir\qml\QtQuick" qml\ -Force
+            Copy-Item -Recurse "$qtDir\qml\Qt5Compat" qml\ -Force
           }
           
-          # Copy FFmpeg
-          Write-Host "Copying FFmpeg DLLs..."
-          Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" .
+          Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
           
           # Verify deployment
           Write-Host "`nVerifying deployment..."
