@@ -108,7 +108,28 @@ jobs:
 
       - name: Create AppImage
         run: |
-          # ... (keep all the previous code until linuxdeploy runs)
+          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          
+          # Find Qt QML path
+          QML_PATH=$(find /usr/lib -type d -name "qml" -path "*/qt6/*" 2>/dev/null | head -1)
+          echo "=== Qt QML path: $QML_PATH ==="
+          
+          # Manually copy ALL Qt QML modules
+          echo "=== Copying Qt QML modules to AppDir ==="
+          mkdir -p AppDir/usr/lib/qt6/qml
+          if [ -d "$QML_PATH" ]; then
+            cp -r "$QML_PATH"/* AppDir/usr/lib/qt6/qml/
+            echo "Copied QML modules"
+          fi
+          
+          # Verify WorkerScript is in AppDir
+          echo "=== Verifying WorkerScript in AppDir ==="
+          find AppDir -name "*WorkerScript*" || echo "WorkerScript NOT in AppDir"
+          
+          export QML_SOURCES_PATHS="$(pwd)/qml"
+          export QMAKE=/usr/lib/qt6/bin/qmake
           
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
