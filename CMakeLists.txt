@@ -122,7 +122,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # Platform-specific settings
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        WIN32_EXECUTABLE TRUE
+        WIN32_EXECUTABLE FALSE
     )
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
