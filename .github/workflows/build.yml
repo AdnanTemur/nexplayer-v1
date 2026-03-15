@@ -100,8 +100,16 @@ jobs:
           wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           
-          export QML_SOURCES_PATHS=qml
+          # Set Qt paths explicitly
+          export QML_SOURCES_PATHS="$(pwd)/qml"
           export QMAKE=/usr/lib/qt6/bin/qmake
+          export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+          
+          # Copy Qt QML modules to ensure they're included
+          mkdir -p AppDir/usr/lib/qt6/qml
+          cp -r /usr/lib/qt6/qml/QtQml AppDir/usr/lib/qt6/qml/ || true
+          cp -r /usr/lib/qt6/qml/QtQuick AppDir/usr/lib/qt6/qml/ || true
+          cp -r /usr/lib/qt6/qml/Qt5Compat AppDir/usr/lib/qt6/qml/ || true
           
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
