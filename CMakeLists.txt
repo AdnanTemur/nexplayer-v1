@@ -124,19 +124,13 @@ if(WIN32)
     # Windows icon resource
     set(APP_ICON_RC "${CMAKE_CURRENT_SOURCE_DIR}/resources/app_icon.rc")
     
+    # Hide console window in release
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
     
     # Add icon to executable
     target_sources(${PROJECT_NAME} PRIVATE ${APP_ICON_RC})
-    
-    # Fix for Qt apps that need both GUI and console output
-    if(MSVC)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            LINK_FLAGS "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
-        )
-    endif()
     
 elseif(APPLE)
     # macOS icon

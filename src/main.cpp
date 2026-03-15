@@ -4,15 +4,56 @@
 #include <QIcon>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
+#include <QTextStream>
 #include "core/PlayerController.h"
 #include "video/VideoRenderer.h"
 
+// File logging for Windows GUI mode
+#ifdef Q_OS_WIN
+static QFile *logFile = nullptr;
+static QTextStream *logStream = nullptr;
+
+void messageHandler(QtMsgType type, const QMessageLogContext &, const QString &msg)
+{
+    if (logStream)
+    {
+        QString prefix;
+        switch (type)
+        {
+        case QtDebugMsg:
+            prefix = "[DEBUG]";
+            break;
+        case QtInfoMsg:
+            prefix = "[INFO]";
+            break;
+        case QtWarningMsg:
+            prefix = "[WARN]";
+            break;
+        case QtCriticalMsg:
+            prefix = "[ERROR]";
+            break;
+        case QtFatalMsg:
+            prefix = "[FATAL]";
+            break;
+        }
+        *logStream << prefix << " " << msg << "\n";
+        logStream->flush();
+    }
+}
+#endif
+
 int main(int argc, char *argv[])
 {
-// Redirect debug to console on Windows
-#ifdef _WIN32
-    freopen("CON", "w", stdout);
-    freopen("CON", "w", stderr);
+#ifdef Q_OS_WIN
+    // Setup file logging
+    QString logPath = QCoreApplication::applicationDirPath() + "/nexplayer.log";
+    logFile = new QFile(logPath);
+    if (logFile->open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        logStream = new QTextStream(logFile);
+        qInstallMessageHandler(messageHandler);
+    }
 #endif
 
     QGuiApplication app(argc, argv);
@@ -89,9 +130,28 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
     {
         qDebug() << "ERROR: No root objects created!";
+#ifdef Q_OS_WIN
+        if (logStream)
+        {
+            delete logStream;
+            logFile->close();
+            delete logFile;
+        }
+#endif
         return -1;
     }
 
     qDebug() << "Entering event loop...";
-    return app.exec();
+    int result = app.exec();
+
+#ifdef Q_OS_WIN
+    if (logStream)
+    {
+        delete logStream;
+        logFile->close();
+        delete logFile;
+    }
+#endif
+
+    return result;
 }
