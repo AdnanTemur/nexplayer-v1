@@ -118,120 +118,21 @@ jobs:
           name: NexPlayer-Linux
           path: NexPlayer-*.AppImage
 
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: "6.5.0"
-          arch: "win64_msvc2019_64"
-          modules: "qtmultimedia qt5compat"
-
-      - name: Download FFmpeg
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile "ffmpeg.zip"
-          Expand-Archive -Path ffmpeg.zip -DestinationPath .
-          Rename-Item -Path "ffmpeg-master-latest-win64-gpl-shared" -NewName "ffmpeg"
-          
-          New-Item -ItemType Directory -Force -Path "ffmpeg/lib/pkgconfig" | Out-Null
-          
-          $workspace = "${{ github.workspace }}".Replace('\', '/')
-          
-          @"
-          prefix=$workspace/ffmpeg
-          exec_prefix=`${prefix}
-          libdir=`${exec_prefix}/lib
-          includedir=`${prefix}/include
-          
-          Name: libavcodec
-          Description: FFmpeg codec library
-          Version: 60.0.0
-          Libs: -L`${libdir} -lavcodec
-          Cflags: -I`${includedir}
-          "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavcodec.pc" -Encoding ASCII
-          
-          @"
-          prefix=$workspace/ffmpeg
-          exec_prefix=`${prefix}
-          libdir=`${exec_prefix}/lib
-          includedir=`${prefix}/include
-          
-          Name: libavformat
-          Description: FFmpeg container format library
-          Version: 60.0.0
-          Libs: -L`${libdir} -lavformat
-          Cflags: -I`${includedir}
-          "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavformat.pc" -Encoding ASCII
-          
-          @"
-          prefix=$workspace/ffmpeg
-          exec_prefix=`${prefix}
-          libdir=`${exec_prefix}/lib
-          includedir=`${prefix}/include
-          
-          Name: libavutil
-          Description: FFmpeg utility library
-          Version: 58.0.0
-          Libs: -L`${libdir} -lavutil
-          Cflags: -I`${includedir}
-          "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavutil.pc" -Encoding ASCII
-          
-          @"
-          prefix=$workspace/ffmpeg
-          exec_prefix=`${prefix}
-          libdir=`${exec_prefix}/lib
-          includedir=`${prefix}/include
-          
-          Name: libswscale
-          Description: FFmpeg image scaling library
-          Version: 7.0.0
-          Libs: -L`${libdir} -lswscale
-          Cflags: -I`${includedir}
-          "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libswscale.pc" -Encoding ASCII
-          
-          @"
-          prefix=$workspace/ffmpeg
-          exec_prefix=`${prefix}
-          libdir=`${exec_prefix}/lib
-          includedir=`${prefix}/include
-          
-          Name: libswresample
-          Description: FFmpeg audio resampling library
-          Version: 4.0.0
-          Libs: -L`${libdir} -lswresample
-          Cflags: -I`${includedir}
-          "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libswresample.pc" -Encoding ASCII
-
-      - name: Install pkg-config
-        run: choco install pkgconfiglite -y
-
-      - name: Build
-        run: |
-          $env:PKG_CONFIG_PATH = "${{ github.workspace }}/ffmpeg/lib/pkgconfig"
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -A x64 ..
-          cmake --build . --config Release
-
       - name: Deploy Qt and FFmpeg
         run: |
           cd build/Release
           
           $qtDir = "$env:Qt6_DIR"
           
-          # Copy essential Qt DLLs manually (windeployqt is failing)
+          # Copy essential Qt DLLs manually
           Write-Host "Copying Qt DLLs..."
           $qtDlls = @(
             "Qt6Core.dll",
             "Qt6Gui.dll",
             "Qt6Qml.dll",
-            "Qt6QmlModels.dll",
-            "Qt6QmlWorkerScript.dll",
             "Qt6Quick.dll",
             "Qt6QuickControls2.dll",
+            "Qt6QuickControls2Impl.dll",
             "Qt6QuickLayouts.dll",
             "Qt6QuickTemplates2.dll",
             "Qt6Multimedia.dll",
@@ -240,20 +141,18 @@ jobs:
             "Qt6OpenGL.dll",
             "Qt6Widgets.dll",
             "Qt6Svg.dll",
-            "Qt6Core5Compat.dll"
+            "Qt6Core5Compat.dll",
+            "Qt6SvgWidgets.dll"
           )
           
           foreach ($dll in $qtDlls) {
             $sourcePath = "$qtDir\bin\$dll"
             if (Test-Path $sourcePath) {
               Copy-Item $sourcePath . -Force
-              Write-Host "  ✓ $dll"
-            } else {
-              Write-Host "  ⚠ $dll not found"
             }
           }
           
-          # Run windeployqt anyway (it might copy some things)
+          # Run windeployqt
           windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release 2>&1 | Out-Null
           
           # Platform plugin
@@ -264,8 +163,7 @@ jobs:
           New-Item -ItemType Directory -Force imageformats | Out-Null
           Copy-Item "$qtDir\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
           
-          # QML modules
-          Write-Host "`nCopying QML modules..."
+          # QML modules with robocopy
           if (Test-Path "$qtDir\qml\QtQuick") {
             robocopy "$qtDir\qml\QtQuick" "qml\QtQuick" /E /NFL /NDL /NJH /NJS /NC /NS /NP
           }
@@ -282,7 +180,6 @@ jobs:
           # FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
           
-          Write-Host "`nDeployment complete"
           exit 0
         shell: pwsh
 
