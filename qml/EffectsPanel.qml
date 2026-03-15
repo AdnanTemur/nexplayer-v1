@@ -146,17 +146,15 @@ Rectangle {
                 spacing: 16
                 
                 // Equalizer
-               EffectCard {
+                EffectCard {
+                    id: eqCard
                     title: "Equalizer"
                     iconSource: "qrc:/icons/sliders.svg"
-                    enabled: panel.eqEnabled  // Bind to stored state
+                    enabled: panel.eqEnabled
                     
-                    // Update stored state when toggled
-                    Connections {
-                        target: this  // The card itself
-                        function onEnabledChanged() {
-                            panel.eqEnabled = enabled
-                        }
+                    onEnabledChanged: {
+                        panel.eqEnabled = enabled
+                        player.enableEffect("Equalizer", enabled)
                     }
                     
                     content: ColumnLayout {
@@ -217,7 +215,7 @@ Rectangle {
                 // Reverb
                 EffectCard {
                     title: "Reverb"
-                    iconSource: "qrc:/icons/waves.svg"  // We'll create this
+                    iconSource: "qrc:/icons/waves.svg"
                     enabled: false
                     
                     content: ColumnLayout {
