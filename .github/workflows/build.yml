@@ -373,47 +373,30 @@ jobs:
           }
           
           Write-Host "Creating README..."
-          $readmeContent = @"
+          
+          @"
           NexPlayer v1.0.0 for Windows
-          ============================
-
+          
           INSTALLATION:
-          1. Extract all files to a folder
+          1. Extract all files
           2. Run NexPlayer.exe
-
+          
           REQUIREMENTS:
-          - Windows 10 or later (64-bit)
-
+          - Windows 10+ (64-bit)
+          
           TROUBLESHOOTING:
-
-          If you get "MSVCP140.dll is missing":
-            Install Visual C++ Redistributable:
-            https://aka.ms/vs/17/release/vc_redist.x64.exe
-
-          If app doesn't start:
-            - Keep all files in the same folder
-            - Right-click NexPlayer.exe -> Properties -> Unblock
-            - Try running as Administrator
-
-          FEATURES:
-          - 6-stage audio effect chain
-          - 10-band parametric equalizer
-          - Professional audio processing
-          - Modern UI with dark/light themes
-
+          If MSVCP140.dll missing: https://aka.ms/vs/17/release/vc_redist.x64.exe
+          
           SOURCE: https://github.com/yourusername/NexPlayer-V1
-          LICENSE: MIT
-          "@
+          "@ | Out-File -FilePath "$packageName\README.txt" -Encoding UTF8
           
-          $readmeContent | Out-File -FilePath "$packageName\README.txt" -Encoding UTF8
+          Write-Host "Package created"
           
-          Write-Host "`n📋 Package contents:"
           $totalSize = (Get-ChildItem -Path $packageName -Recurse -File | Measure-Object -Property Length -Sum).Sum
           $fileCount = (Get-ChildItem -Path $packageName -Recurse -File | Measure-Object).Count
-          Write-Host "  Files: $fileCount"
-          Write-Host "  Total size: $([math]::Round($totalSize / 1MB, 2)) MB"
+          Write-Host "Files: $fileCount, Size: $([math]::Round($totalSize / 1MB, 2)) MB"
           
-          Write-Host "`nCreating ZIP archive..."
+          Write-Host "Creating ZIP..."
           $zipPath = "..\..\NexPlayer-Windows.zip"
           
           if (Test-Path $zipPath) {
@@ -424,11 +407,9 @@ jobs:
           
           if (Test-Path $zipPath) {
             $zipSize = (Get-Item $zipPath).Length / 1MB
-            Write-Host "`n✅ Package created successfully!"
-            Write-Host "   File: NexPlayer-Windows.zip"
-            Write-Host "   Size: $([math]::Round($zipSize, 2)) MB"
+            Write-Host "✅ ZIP created: $([math]::Round($zipSize, 2)) MB"
           } else {
-            Write-Error "❌ Failed to create ZIP file!"
+            Write-Error "Failed to create ZIP"
             exit 1
           }
 
