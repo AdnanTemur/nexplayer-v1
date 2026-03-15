@@ -234,13 +234,38 @@ jobs:
           }
         shell: pwsh
 
-      - name: Create ZIP
+      - name: Create Release Package
         run: |
           cd build/Release
-          Compress-Archive -Path * -DestinationPath ../../NexPlayer-Windows.zip
+          
+          # Create clean package folder (don't zip it)
+          $packageDir = "NexPlayer-Windows"
+          
+          if (Test-Path $packageDir) {
+            Remove-Item -Recurse -Force $packageDir
+          }
+          
+          New-Item -ItemType Directory -Force $packageDir | Out-Null
+          
+          # Copy files
+          Copy-Item "NexPlayer.exe" $packageDir\ -Force
+          Copy-Item "*.dll" $packageDir\ -Force
+          Copy-Item -Recurse "platforms" $packageDir\ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "qml" $packageDir\ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "imageformats" $packageDir\ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "multimedia" $packageDir\ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "generic" $packageDir\ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "iconengines" $packageDir\ -Force -ErrorAction SilentlyContinue
+          
+          # Create README
+          @"
+          NexPlayer v1.0.0 for Windows
+          
+          Run NexPlayer.exe
+          "@ | Out-File -FilePath "$packageDir\README.txt" -Encoding UTF8
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NexPlayer-Windows
-          path: NexPlayer-Windows.zip
+          path: build/Release/NexPlayer-Windows
