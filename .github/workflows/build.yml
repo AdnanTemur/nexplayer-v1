@@ -132,14 +132,10 @@ jobs:
 
       - name: Download FFmpeg
         run: |
-          Write-Host "📦 Downloading FFmpeg..."
           Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile "ffmpeg.zip"
-          
-          Write-Host "📂 Extracting FFmpeg..."
           Expand-Archive -Path ffmpeg.zip -DestinationPath .
           Rename-Item -Path "ffmpeg-master-latest-win64-gpl-shared" -NewName "ffmpeg"
           
-          Write-Host "📝 Creating pkg-config files..."
           New-Item -ItemType Directory -Force -Path "ffmpeg/lib/pkgconfig" | Out-Null
           
           $workspace = "${{ github.workspace }}".Replace('\', '/')
@@ -208,60 +204,36 @@ jobs:
           Libs: -L`${libdir} -lswresample
           Cflags: -I`${includedir}
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libswresample.pc" -Encoding ASCII
-          
-          Write-Host "✅ FFmpeg setup complete"
 
       - name: Install pkg-config
-        run: |
-          Write-Host "📦 Installing pkg-config..."
-          choco install pkgconfiglite -y
+        run: choco install pkgconfiglite -y
 
       - name: Build
         run: |
-          Write-Host "🔨 Building NexPlayer..."
           $env:PKG_CONFIG_PATH = "${{ github.workspace }}/ffmpeg/lib/pkgconfig"
-          
           mkdir build
           cd build
-          
-          Write-Host "Running CMake..."
           cmake -G "Visual Studio 17 2022" -A x64 ..
-          
-          Write-Host "Compiling..."
           cmake --build . --config Release
-          
-          Write-Host "✅ Build complete"
 
       - name: Deploy Qt and FFmpeg
         run: |
           cd build/Release
           
-          $qtDir = "$env:Qt6_DIR"
-          
-          # Run windeployqt without hiding output
           windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release
           
-          # Manually ensure critical files
           if (-not (Test-Path "platforms\qwindows.dll")) {
             New-Item -ItemType Directory -Force platforms | Out-Null
-            Copy-Item "$qtDir\plugins\platforms\qwindows.dll" platforms\ -Force
+            Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" platforms\ -Force
           }
           
           if (-not (Test-Path "qml\QtQuick\Controls")) {
             New-Item -ItemType Directory -Force qml | Out-Null
-            Copy-Item -Recurse "$qtDir\qml\QtQuick" qml\ -Force
-            Copy-Item -Recurse "$qtDir\qml\Qt5Compat" qml\ -Force
+            Copy-Item -Recurse "$env:Qt6_DIR\qml\QtQuick" qml\ -Force
+            Copy-Item -Recurse "$env:Qt6_DIR\qml\Qt5Compat" qml\ -Force
           }
           
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
-          
-          # Verify deployment
-          Write-Host "`nVerifying deployment..."
-          Write-Host "Platform plugin present: $(Test-Path "platforms\qwindows.dll")"
-          Write-Host "QML Controls present: $(Test-Path "qml\QtQuick\Controls\qmldir")"
-          Write-Host "FFmpeg DLLs present: $((Get-ChildItem av*.dll).Count) files"
-          
-          Write-Host "`nDeployment complete"
         shell: pwsh
 
       - name: Create ZIP
