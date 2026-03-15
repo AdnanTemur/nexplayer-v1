@@ -339,94 +339,99 @@ jobs:
           Write-Host "`n✅ Deployment complete"
 
       - name: Create Release Package
-        run: |
-          Write-Host "📦 Creating release package..."
-          cd build/Release
-          
-          $packageName = "NexPlayer-1.0.0-Windows"
-          
-          # Create clean package directory
-          if (Test-Path $packageName) {
-            Remove-Item -Recurse -Force $packageName
-          }
-          New-Item -ItemType Directory -Force -Path $packageName | Out-Null
-          
-          Write-Host "Copying executable..."
-          Copy-Item "NexPlayer.exe" -Destination $packageName -Force
-          
-          Write-Host "Copying DLLs..."
-          Get-ChildItem "*.dll" | Copy-Item -Destination $packageName -Force
-          
-          Write-Host "Copying plugins and QML..."
-          
-          # Copy folders if they exist
-          $foldersToCheck = @("platforms", "qml", "imageformats", "styles", "QtQuick", "Qt5Compat")
-          
-          foreach ($folder in $foldersToCheck) {
-            if (Test-Path $folder) {
-              Write-Host "  Copying $folder..."
-              Copy-Item -Recurse -Force $folder -Destination $packageName -ErrorAction SilentlyContinue
-            } else {
-              Write-Host "  Skipping $folder (not found)"
-            }
-          }
-          
-          # Create README
-          @"
-          NexPlayer v1.0.0 for Windows
-          ============================
+              run: |
+                Write-Host "📦 Creating release package..."
+                cd build/Release
+                
+                $packageName = "NexPlayer-1.0.0-Windows"
+                
+                if (Test-Path $packageName) {
+                  Remove-Item -Recurse -Force $packageName
+                }
+                
+                New-Item -ItemType Directory -Force -Path $packageName | Out-Null
+                
+                Write-Host "Copying NexPlayer.exe..."
+                Copy-Item "NexPlayer.exe" -Destination $packageName -Force
+                
+                Write-Host "Copying DLLs..."
+                Get-ChildItem "*.dll" -File | ForEach-Object {
+                  Copy-Item $_.FullName -Destination $packageName -Force
+                }
+                
+                Write-Host "Copying plugins and QML modules..."
+                
+                $folders = @("platforms", "qml", "imageformats", "styles")
+                
+                foreach ($folder in $folders) {
+                  if (Test-Path $folder -PathType Container) {
+                    Write-Host "  Copying $folder..."
+                    Copy-Item -Path $folder -Destination $packageName -Recurse -Force
+                  } else {
+                    Write-Host "  Skipping $folder (not found)"
+                  }
+                }
+                
+                Write-Host "Creating README..."
+                $readmeContent = @"
+                  NexPlayer v1.0.0 for Windows
+                  ============================
 
-          INSTALLATION:
-          1. Extract all files to a folder
-          2. Run NexPlayer.exe
+                  INSTALLATION:
+                  1. Extract all files to a folder
+                  2. Run NexPlayer.exe
 
-          REQUIREMENTS:
-          - Windows 10 or later (64-bit)
+                  REQUIREMENTS:
+                  - Windows 10 or later (64-bit)
 
-          TROUBLESHOOTING:
+                  TROUBLESHOOTING:
 
-          "MSVCP140.dll is missing" error:
-            Install Visual C++ Redistributable:
-            https://aka.ms/vs/17/release/vc_redist.x64.exe
+                  If you get "MSVCP140.dll is missing":
+                    Install Visual C++ Redistributable:
+                    https://aka.ms/vs/17/release/vc_redist.x64.exe
 
-          App doesn't start:
-            - Keep all files in the same folder
-            - Right-click NexPlayer.exe → Properties → Unblock
-            - Try running as Administrator
+                  If app doesn't start:
+                    - Keep all files in the same folder
+                    - Right-click NexPlayer.exe -> Properties -> Unblock
+                    - Try running as Administrator
 
-          FEATURES:
-          - 6-stage audio effect chain
-          - 10-band parametric equalizer
-          - Professional audio processing
-          - Modern UI with themes
+                  FEATURES:
+                  - 6-stage audio effect chain
+                  - 10-band parametric equalizer
+                  - Professional audio processing
+                  - Modern UI with dark/light themes
 
-          SOURCE: https://github.com/yourusername/NexPlayer-V1
-          LICENSE: MIT
-          "@ | Out-File -FilePath "$packageName\README.txt" -Encoding UTF8
-          
-          Write-Host "`n📋 Package contents:"
-          Get-ChildItem $packageName -Recurse -File | 
-            Measure-Object -Property Length -Sum | 
-            Select-Object @{Name="Files";Expression={$_.Count}}, @{Name="TotalSize";Expression={"{0:N2} MB" -f ($_.Sum / 1MB)}}
-          
-          Write-Host "`nCreating ZIP archive..."
-          $zipPath = "..\..\NexPlayer-Windows.zip"
-          
-          if (Test-Path $zipPath) {
-            Remove-Item $zipPath -Force
-          }
-          
-          Compress-Archive -Path $packageName -DestinationPath $zipPath -CompressionLevel Optimal -Force
-          
-          if (Test-Path $zipPath) {
-            $zipSize = (Get-Item $zipPath).Length / 1MB
-            Write-Host "✅ Package created successfully!"
-            Write-Host "   File: NexPlayer-Windows.zip"
-            Write-Host "   Size: $("{0:N2}" -f $zipSize) MB"
-          } else {
-            Write-Error "Failed to create ZIP file"
-            exit 1
-          }
+                  SOURCE: https://github.com/yourusername/NexPlayer-V1
+                  LICENSE: MIT
+                  "@
+                
+                $readmeContent | Out-File -FilePath "$packageName\README.txt" -Encoding UTF8
+                
+                Write-Host "`n📋 Package contents:"
+                $totalSize = (Get-ChildItem -Path $packageName -Recurse -File | Measure-Object -Property Length -Sum).Sum
+                $fileCount = (Get-ChildItem -Path $packageName -Recurse -File | Measure-Object).Count
+                Write-Host "  Files: $fileCount"
+                Write-Host "  Total size: $([math]::Round($totalSize / 1MB, 2)) MB"
+                
+                Write-Host "`nCreating ZIP archive..."
+                $zipPath = "..\..\NexPlayer-Windows.zip"
+                
+                if (Test-Path $zipPath) {
+                  Remove-Item $zipPath -Force
+                }
+                
+                Compress-Archive -Path $packageName -DestinationPath $zipPath -CompressionLevel Optimal -Force
+                
+                if (Test-Path $zipPath) {
+                  $zipSize = (Get-Item $zipPath).Length / 1MB
+                  Write-Host "`n✅ Package created successfully!"
+                  Write-Host "   File: NexPlayer-Windows.zip"
+                  Write-Host "   Size: $([math]::Round($zipSize, 2)) MB"
+                } else {
+                  Write-Error "❌ Failed to create ZIP file!"
+                  exit 1
+                }
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
