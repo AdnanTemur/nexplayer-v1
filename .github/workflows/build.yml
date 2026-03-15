@@ -88,12 +88,9 @@ jobs:
 
       - name: Create icon
         run: |
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          sudo apt install -y imagemagick
-          convert -size 256x256 xc:transparent \
-            -fill "#10b981" -draw "circle 128,128 128,64" \
-            -fill white -pointsize 60 -gravity center -annotate +0+0 "NP" \
-            AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png
+          mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
+          # Copy your actual icon instead of generating one
+          cp resources/icon.png AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png
 
       - name: Create AppImage
         run: |
@@ -107,7 +104,7 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
             --desktop-file=AppDir/usr/share/applications/nexplayer.desktop \
-            --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png \
+            --icon-file=AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png \
             --appdir=AppDir \
             --plugin=qt \
             --output=appimage
