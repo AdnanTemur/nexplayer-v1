@@ -221,27 +221,16 @@ jobs:
           cd build/Release
           
           $qtDir = "$env:Qt6_DIR"
+          $env:PATH = "$qtDir\bin;$env:PATH"
           
-          # Copy ALL DLLs from Qt bin
-          Copy-Item "$qtDir\bin\*.dll" . -Force
+          # Let windeployqt do its job - don't suppress output
+          windeployqt NexPlayer.exe --qmldir ../../qml --release --compiler-runtime
           
-          # Run windeployqt
-          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release 2>&1 | Out-Null
-          
-          # Platform plugin
-          New-Item -ItemType Directory -Force platforms | Out-Null
-          Copy-Item "$qtDir\plugins\platforms\qwindows.dll" platforms\ -Force
-          
-          # Image formats
-          New-Item -ItemType Directory -Force imageformats | Out-Null
-          Copy-Item "$qtDir\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
-          
-          # QML modules - copy EVERYTHING
-          New-Item -ItemType Directory -Force qml | Out-Null
-          Copy-Item -Recurse -Force "$qtDir\qml\*" "qml\" -ErrorAction SilentlyContinue
-          
-          # FFmpeg DLLs
+          # Only add FFmpeg (windeployqt doesn't know about it)
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
+          
+          # Add d3dcompiler_47.dll for graphics effects
+          Copy-Item "C:\Windows\System32\d3dcompiler_47.dll" . -Force
           
           exit 0
         shell: pwsh
