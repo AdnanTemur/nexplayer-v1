@@ -2,8 +2,6 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QIcon>
-#include <QDebug>
-#include <QDir>
 #include "core/PlayerController.h"
 #include "video/VideoRenderer.h"
 
@@ -17,44 +15,8 @@ int main(int argc, char *argv[])
     app.setApplicationName("NexPlayer");
     app.setApplicationVersion("1.0.0");
     
-    // DIAGNOSTIC: Show where we're running from
-    qDebug() << "=== NexPlayer Diagnostics ===";
-    qDebug() << "Application dir:" << QCoreApplication::applicationDirPath();
-    qDebug() << "Current dir:" << QDir::currentPath();
-    
-    // Check if qml folder exists
-    QString qmlPath = QCoreApplication::applicationDirPath() + "/qml";
-    qDebug() << "Looking for QML modules at:" << qmlPath;
-    qDebug() << "QML folder exists:" << QDir(qmlPath).exists();
-    
-    if (QDir(qmlPath).exists()) {
-        qDebug() << "QML folder contents:";
-        QDir qmlDir(qmlPath);
-        for (const QString &entry : qmlDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-            qDebug() << "  -" << entry;
-            
-            // Check for qmldir files
-            QString qmldirPath = qmlPath + "/" + entry + "/qmldir";
-            if (QFile::exists(qmldirPath)) {
-                qDebug() << "    ✓ Has qmldir";
-            } else {
-                qDebug() << "    ✗ Missing qmldir";
-            }
-        }
-    }
-    
     // Create QML engine
     QQmlApplicationEngine engine;
-    
-    // Add QML import path for deployed modules
-    engine.addImportPath(qmlPath);
-    
-    // Show what import paths Qt is using
-    qDebug() << "\nQML Import Paths:";
-    for (const QString &path : engine.importPathList()) {
-        qDebug() << "  -" << path;
-    }
-    qDebug() << "=============================\n";
     
     // Register C++ types with QML
     qmlRegisterType<PlayerController>("NexPlayer", 1, 0, "PlayerController");
@@ -66,12 +28,17 @@ int main(int argc, char *argv[])
     // Expose to QML
     engine.rootContext()->setContextProperty("player", &playerController);
     
-    // Load main QML file
+    // Load main QML filez
+    // For development: use file path for hot reload
+    // For production: use qrc resource
+    
     #ifdef QML_HOT_RELOAD
+        // Development mode: load from filesystem (hot reload enabled!)
         const QUrl url = QUrl::fromLocalFile(QCoreApplication::applicationDirPath() + "/../qml/main.qml");
         qDebug() << "🔥 Hot Reload Mode: Edit QML files and save to see changes!";
         qDebug() << "📂 Loading from:" << url;
     #else
+        // Production mode: load from embedded resources
         const QUrl url(QStringLiteral("qrc:/main.qml"));
     #endif
     

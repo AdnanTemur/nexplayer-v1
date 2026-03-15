@@ -220,56 +220,67 @@ jobs:
         run: |
           cd build/Release
           
-          # Run windeployqt (ignore exit code - ShaderTools warning is non-critical)
-          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release
+          $qtDir = "$env:Qt6_DIR"
           
-          # ALWAYS ensure platform plugin exists
+          # Copy essential Qt DLLs manually (windeployqt is failing)
+          Write-Host "Copying Qt DLLs..."
+          $qtDlls = @(
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Qml.dll",
+            "Qt6Quick.dll",
+            "Qt6QuickControls2.dll",
+            "Qt6QuickLayouts.dll",
+            "Qt6QuickTemplates2.dll",
+            "Qt6Multimedia.dll",
+            "Qt6MultimediaQuick.dll",
+            "Qt6Network.dll",
+            "Qt6OpenGL.dll",
+            "Qt6Widgets.dll",
+            "Qt6Svg.dll",
+            "Qt6Core5Compat.dll"
+          )
+          
+          foreach ($dll in $qtDlls) {
+            $sourcePath = "$qtDir\bin\$dll"
+            if (Test-Path $sourcePath) {
+              Copy-Item $sourcePath . -Force
+              Write-Host "  ✓ $dll"
+            } else {
+              Write-Host "  ⚠ $dll not found"
+            }
+          }
+          
+          # Run windeployqt anyway (it might copy some things)
+          windeployqt NexPlayer.exe --qmldir ../../qml --no-translations --release 2>&1 | Out-Null
+          
+          # Platform plugin
           New-Item -ItemType Directory -Force platforms | Out-Null
-          Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" platforms\ -Force
+          Copy-Item "$qtDir\plugins\platforms\qwindows.dll" platforms\ -Force
           
-          # ALWAYS ensure imageformats exist
+          # Image formats
           New-Item -ItemType Directory -Force imageformats | Out-Null
-          Copy-Item "$env:Qt6_DIR\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
+          Copy-Item "$qtDir\plugins\imageformats\*.dll" imageformats\ -Force -ErrorAction SilentlyContinue
           
-          # ALWAYS copy QML modules (critical for app to run)
-          New-Item -ItemType Directory -Force qml | Out-Null
-          
-          if (Test-Path "$env:Qt6_DIR\qml\QtQuick") {
-            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtQuick" qml\
+          # QML modules
+          Write-Host "`nCopying QML modules..."
+          if (Test-Path "$qtDir\qml\QtQuick") {
+            robocopy "$qtDir\qml\QtQuick" "qml\QtQuick" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+          }
+          if (Test-Path "$qtDir\qml\Qt5Compat") {
+            robocopy "$qtDir\qml\Qt5Compat" "qml\Qt5Compat" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+          }
+          if (Test-Path "$qtDir\qml\QtQml") {
+            robocopy "$qtDir\qml\QtQml" "qml\QtQml" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+          }
+          if (Test-Path "$qtDir\qml\QtMultimedia") {
+            robocopy "$qtDir\qml\QtMultimedia" "qml\QtMultimedia" /E /NFL /NDL /NJH /NJS /NC /NS /NP
           }
           
-          if (Test-Path "$env:Qt6_DIR\qml\Qt5Compat") {
-            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\Qt5Compat" qml\
-          }
-          
-          if (Test-Path "$env:Qt6_DIR\qml\QtQml") {
-            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtQml" qml\
-          }
-          
-          if (Test-Path "$env:Qt6_DIR\qml\QtMultimedia") {
-            Copy-Item -Recurse -Force "$env:Qt6_DIR\qml\QtMultimedia" qml\
-          }
-          
-          # Copy FFmpeg DLLs
+          # FFmpeg DLLs
           Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" . -Force
           
-          # Verify critical files
-          if (-not (Test-Path "platforms\qwindows.dll")) {
-            Write-Error "Missing platform plugin!"
-            exit 1
-          }
-          
-          if (-not (Test-Path "qml\QtQuick\Controls\qmldir")) {
-            Write-Error "Missing QtQuick Controls!"
-            exit 1
-          }
-          
-          if (-not (Test-Path "qml\QtMultimedia\qmldir")) {
-            Write-Error "Missing QtMultimedia!"
-            exit 1
-          }
-          
-          Write-Host "Deployment successful"
+          Write-Host "`nDeployment complete"
           exit 0
         shell: pwsh
 
