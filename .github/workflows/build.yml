@@ -128,18 +128,24 @@ jobs:
         with:
           version: "6.5.0"
           arch: "win64_msvc2019_64"
-          modules: "qtmultimedia"
+          modules: "qtmultimedia qt5compat"
 
       - name: Download FFmpeg
         run: |
+          Write-Host "📦 Downloading FFmpeg..."
           Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile "ffmpeg.zip"
+          
+          Write-Host "📂 Extracting FFmpeg..."
           Expand-Archive -Path ffmpeg.zip -DestinationPath .
           Rename-Item -Path "ffmpeg-master-latest-win64-gpl-shared" -NewName "ffmpeg"
           
-          New-Item -ItemType Directory -Force -Path "ffmpeg/lib/pkgconfig"
+          Write-Host "📝 Creating pkg-config files..."
+          New-Item -ItemType Directory -Force -Path "ffmpeg/lib/pkgconfig" | Out-Null
+          
+          $workspace = "${{ github.workspace }}".Replace('\', '/')
           
           @"
-          prefix=${{ github.workspace }}/ffmpeg
+          prefix=$workspace/ffmpeg
           exec_prefix=`${prefix}
           libdir=`${exec_prefix}/lib
           includedir=`${prefix}/include
@@ -152,7 +158,7 @@ jobs:
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavcodec.pc" -Encoding ASCII
           
           @"
-          prefix=${{ github.workspace }}/ffmpeg
+          prefix=$workspace/ffmpeg
           exec_prefix=`${prefix}
           libdir=`${exec_prefix}/lib
           includedir=`${prefix}/include
@@ -165,7 +171,7 @@ jobs:
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavformat.pc" -Encoding ASCII
           
           @"
-          prefix=${{ github.workspace }}/ffmpeg
+          prefix=$workspace/ffmpeg
           exec_prefix=`${prefix}
           libdir=`${exec_prefix}/lib
           includedir=`${prefix}/include
@@ -178,7 +184,7 @@ jobs:
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libavutil.pc" -Encoding ASCII
           
           @"
-          prefix=${{ github.workspace }}/ffmpeg
+          prefix=$workspace/ffmpeg
           exec_prefix=`${prefix}
           libdir=`${exec_prefix}/lib
           includedir=`${prefix}/include
@@ -191,7 +197,7 @@ jobs:
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libswscale.pc" -Encoding ASCII
           
           @"
-          prefix=${{ github.workspace }}/ffmpeg
+          prefix=$workspace/ffmpeg
           exec_prefix=`${prefix}
           libdir=`${exec_prefix}/lib
           includedir=`${prefix}/include
@@ -202,53 +208,126 @@ jobs:
           Libs: -L`${libdir} -lswresample
           Cflags: -I`${includedir}
           "@ | Out-File -FilePath "ffmpeg/lib/pkgconfig/libswresample.pc" -Encoding ASCII
+          
+          Write-Host "✅ FFmpeg setup complete"
 
       - name: Install pkg-config
-        run: choco install pkgconfiglite -y
+        run: |
+          Write-Host "📦 Installing pkg-config..."
+          choco install pkgconfiglite -y
 
       - name: Build
         run: |
+          Write-Host "🔨 Building NexPlayer..."
           $env:PKG_CONFIG_PATH = "${{ github.workspace }}/ffmpeg/lib/pkgconfig"
+          
           mkdir build
           cd build
+          
+          Write-Host "Running CMake..."
           cmake -G "Visual Studio 17 2022" -A x64 ..
+          
+          Write-Host "Compiling..."
           cmake --build . --config Release
+          
+          Write-Host "✅ Build complete"
 
-      - name: Deploy
-            run: |
-              cd build/Release
-              
-              $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
-              windeployqt NexPlayer.exe `
-                --qmldir ../../qml `
-                --qmlimport ../../qml `
-                --no-translations `
-                --release `
-                --compiler-runtime
-              
-              $requiredFiles = @(
-                "platforms\qwindows.dll",
-                "qml\QtQuick\Controls\qmldir",
-                "qml\QtQuick\Layouts\qmldir",
-                "qml\Qt5Compat\GraphicalEffects\qmldir"
-              )
-              
-              foreach ($file in $requiredFiles) {
-                if (-not (Test-Path $file)) {
-                  Write-Error "Missing: $file"
-                  exit 1
-                }
-              }
-              
-              Write-Host "Copying FFmpeg DLLs..."
-              Copy-Item "${{ github.workspace }}/ffmpeg/bin/*.dll" -Destination . -Force
-              
-              Write-Host "`nDeployment successful!"
-
-      - name: Create ZIP
+      - name: Deploy Qt and FFmpeg
         run: |
+          Write-Host "📦 Deploying Qt dependencies..."
           cd build/Release
-          Compress-Archive -Path * -DestinationPath ../../NexPlayer-Windows.zip
+          
+          $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+          
+          windeployqt NexPlayer.exe `
+            --qmldir ../../qml `
+            --qmlimport ../../qml `
+            --no-translations `
+            --release `
+            --compiler-runtime `
+            --verbose 1
+          
+          Write-Host "`n📋 Verifying critical files..."
+          
+          if (-not (Test-Path "platforms\qwindows.dll")) {
+            Write-Error "❌ Missing platform plugin: platforms\qwindows.dll"
+            exit 1
+          }
+          Write-Host "✅ Platform plugin found"
+          
+          $qmlModules = @(
+            "qml\QtQuick\Controls",
+            "qml\QtQuick\Layouts"
+          )
+          
+          foreach ($module in $qmlModules) {
+            if (Test-Path "$module\qmldir") {
+              Write-Host "✅ QML module: $module"
+            } else {
+              Write-Warning "⚠️  Missing QML module: $module"
+            }
+          }
+          
+          Write-Host "`n📦 Copying FFmpeg DLLs..."
+          $ffmpegBin = "${{ github.workspace }}/ffmpeg/bin"
+          
+          Copy-Item "$ffmpegBin\*.dll" -Destination . -Force
+          
+          Write-Host "`n📊 Deployment summary:"
+          Write-Host "DLLs in Release folder:"
+          Get-ChildItem *.dll | Select-Object Name, @{Name="Size";Expression={"{0:N2} MB" -f ($_.Length / 1MB)}} | Format-Table
+          
+          Write-Host "`n✅ Deployment complete"
+
+      - name: Create Release Package
+        run: |
+          Write-Host "📦 Creating release package..."
+          cd build/Release
+          
+          $packageName = "NexPlayer-1.0.0-Windows"
+          
+          New-Item -ItemType Directory -Force -Path $packageName | Out-Null
+          
+          Write-Host "Copying files..."
+          
+          Copy-Item NexPlayer.exe -Destination $packageName -Force
+          Copy-Item *.dll -Destination $packageName -Force
+          
+          $folders = @("platforms", "qml", "QtQuick", "Qt5Compat", "styles", "imageformats")
+          foreach ($folder in $folders) {
+            if (Test-Path $folder) {
+              Copy-Item -Recurse -Force $folder -Destination $packageName -ErrorAction SilentlyContinue
+            }
+          }
+          
+          @"
+          NexPlayer v1.0.0 for Windows
+          ============================
+          
+          INSTALLATION:
+          1. Extract this ZIP file
+          2. Run NexPlayer.exe
+          
+          REQUIREMENTS:
+          - Windows 10 or later (64-bit)
+          
+          If "MSVCP140.dll is missing" error:
+            Install Visual C++ Redistributable:
+            https://aka.ms/vs/17/release/vc_redist.x64.exe
+          
+          TROUBLESHOOTING:
+          - Keep all files together in same folder
+          - Right-click NexPlayer.exe → Properties → Unblock
+          
+          SOURCE: https://github.com/yourusername/NexPlayer-V1
+          LICENSE: MIT
+          "@ | Out-File -FilePath "$packageName\README.txt" -Encoding UTF8
+          
+          Write-Host "`nCreating ZIP archive..."
+          Compress-Archive -Path $packageName -DestinationPath "../../NexPlayer-Windows.zip" -Force
+          
+          $zipSize = (Get-Item "../../NexPlayer-Windows.zip").Length / 1MB
+          Write-Host "`n✅ Package created: NexPlayer-Windows.zip ($("{0:N2}" -f $zipSize) MB)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
