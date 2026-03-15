@@ -237,29 +237,27 @@ jobs:
           Write-Host "📦 Deploying Qt dependencies..."
           cd build/Release
           
-          $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+          $qtDir = "$env:Qt6_DIR"
+          $env:PATH = "$qtDir\bin;$env:PATH"
           
-          # Run windeployqt (ignore ShaderTools warning)
+          # Run windeployqt (best effort, ignore errors)
+          Write-Host "Running windeployqt..."
           windeployqt NexPlayer.exe `
             --qmldir ../../qml `
-            --qmlimport ../../qml `
             --no-translations `
             --release `
             --compiler-runtime 2>&1 | Out-String | Write-Host
           
           Write-Host "`n📋 Ensuring platform plugin exists..."
           
-          # Manually copy platform plugin if missing
-          if (-not (Test-Path "platforms\qwindows.dll")) {
-            Write-Host "Platform plugin not deployed, copying manually..."
-            New-Item -ItemType Directory -Force -Path "platforms" | Out-Null
-            Copy-Item "$env:Qt6_DIR\plugins\platforms\qwindows.dll" -Destination "platforms\" -Force
-            Copy-Item "$env:Qt6_DIR\plugins\platforms\qminimal.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
-            Copy-Item "$env:Qt6_DIR\plugins\platforms\qoffscreen.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
-          }
+          # Manually copy platform plugins
+          New-Item -ItemType Directory -Force -Path "platforms" | Out-Null
+          Copy-Item "$qtDir\plugins\platforms\qwindows.dll" -Destination "platforms\" -Force
+          Copy-Item "$qtDir\plugins\platforms\qminimal.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$qtDir\plugins\platforms\qoffscreen.dll" -Destination "platforms\" -Force -ErrorAction SilentlyContinue
           
           if (-not (Test-Path "platforms\qwindows.dll")) {
-            Write-Error "❌ Still missing platform plugin!"
+            Write-Error "❌ Platform plugin missing!"
             exit 1
           }
           Write-Host "✅ Platform plugin confirmed"
@@ -267,38 +265,76 @@ jobs:
           # Manually copy image format plugins
           Write-Host "`nCopying image format plugins..."
           New-Item -ItemType Directory -Force -Path "imageformats" | Out-Null
-          Copy-Item "$env:Qt6_DIR\plugins\imageformats\*.dll" -Destination "imageformats\" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$qtDir\plugins\imageformats\*.dll" -Destination "imageformats\" -Force -ErrorAction SilentlyContinue
           
-          # Manually copy styles
-          Write-Host "Copying Qt styles..."
-          New-Item -ItemType Directory -Force -Path "styles" | Out-Null
-          Copy-Item "$env:Qt6_DIR\plugins\styles\*.dll" -Destination "styles\" -Force -ErrorAction SilentlyContinue
+          # Manually copy QML modules
+          Write-Host "`nCopying QML modules..."
+          New-Item -ItemType Directory -Force -Path "qml" | Out-Null
           
-          # Check QML modules
-          Write-Host "`nChecking QML modules..."
+          # Copy QtQuick
+          if (Test-Path "$qtDir\qml\QtQuick") {
+            Copy-Item -Recurse -Force "$qtDir\qml\QtQuick" -Destination "qml\" -ErrorAction SilentlyContinue
+            Write-Host "✅ Copied QtQuick"
+          }
+          
+          # Copy Qt5Compat
+          if (Test-Path "$qtDir\qml\Qt5Compat") {
+            Copy-Item -Recurse -Force "$qtDir\qml\Qt5Compat" -Destination "qml\" -ErrorAction SilentlyContinue
+            Write-Host "✅ Copied Qt5Compat"
+          }
+          
+          # Copy QtQml
+          if (Test-Path "$qtDir\qml\QtQml") {
+            Copy-Item -Recurse -Force "$qtDir\qml\QtQml" -Destination "qml\" -ErrorAction SilentlyContinue
+            Write-Host "✅ Copied QtQml"
+          }
+          
+          # Copy QtMultimedia
+          if (Test-Path "$qtDir\qml\QtMultimedia") {
+            Copy-Item -Recurse -Force "$qtDir\qml\QtMultimedia" -Destination "qml\" -ErrorAction SilentlyContinue
+            Write-Host "✅ Copied QtMultimedia"
+          }
+          
+          # Verify QML modules
+          Write-Host "`nVerifying QML modules..."
           $qmlModules = @(
             "qml\QtQuick\Controls",
             "qml\QtQuick\Layouts"
           )
           
+          $allFound = $true
           foreach ($module in $qmlModules) {
             if (Test-Path "$module\qmldir") {
               Write-Host "✅ QML module: $module"
             } else {
               Write-Warning "⚠️  Missing QML module: $module"
+              $allFound = $false
             }
           }
           
+          if (-not $allFound) {
+            Write-Host "`nAvailable QML modules in Qt:"
+            Get-ChildItem "$qtDir\qml" -Directory | Select-Object Name
+          }
+          
+          # Copy FFmpeg DLLs
           Write-Host "`n📦 Copying FFmpeg DLLs..."
           $ffmpegBin = "${{ github.workspace }}/ffmpeg/bin"
           Copy-Item "$ffmpegBin\*.dll" -Destination . -Force
           
+          # Summary
           Write-Host "`n📊 Deployment summary:"
-          Write-Host "Main DLLs:"
-          Get-ChildItem *.dll | Select-Object Name -First 10
+          Write-Host "`nQt DLLs:"
+          Get-ChildItem Qt6*.dll | Select-Object Name
+          
+          Write-Host "`nFFmpeg DLLs:"
+          Get-ChildItem av*.dll,sw*.dll | Select-Object Name
           
           Write-Host "`nPlatform plugins:"
           Get-ChildItem platforms\*.dll | Select-Object Name
+          
+          Write-Host "`nQML modules:"
+          Get-ChildItem qml -Directory -ErrorAction SilentlyContinue | Select-Object Name
           
           Write-Host "`n✅ Deployment complete"
 
