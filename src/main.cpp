@@ -4,94 +4,108 @@
 #include <QIcon>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
+#include <QTextStream>
 #include "core/PlayerController.h"
 #include "video/VideoRenderer.h"
 
+// Custom message handler to write to file
+QFile *logFile = nullptr;
+QTextStream *logStream = nullptr;
+
+void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    QString formattedMsg;
+    switch (type) {
+        case QtDebugMsg:    formattedMsg = QString("[DEBUG] %1").arg(msg); break;
+        case QtInfoMsg:     formattedMsg = QString("[INFO] %1").arg(msg); break;
+        case QtWarningMsg:  formattedMsg = QString("[WARNING] %1").arg(msg); break;
+        case QtCriticalMsg: formattedMsg = QString("[CRITICAL] %1").arg(msg); break;
+        case QtFatalMsg:    formattedMsg = QString("[FATAL] %1").arg(msg); break;
+    }
+    
+    if (logStream) {
+        *logStream << formattedMsg << "\n";
+        logStream->flush();
+    }
+}
+
 int main(int argc, char *argv[])
 {
-// Redirect debug to console on Windows
-#ifdef _WIN32
-    freopen("CON", "w", stdout);
-    freopen("CON", "w", stderr);
-#endif
-
+    // Setup log file FIRST - before anything else
+    QString logPath = QCoreApplication::applicationDirPath() + "/nexplayer-debug.log";
+    logFile = new QFile(logPath);
+    if (logFile->open(QIODevice::WriteOnly | QIODevice::Text)) {
+        logStream = new QTextStream(logFile);
+        qInstallMessageHandler(messageHandler);
+        qDebug() << "=== NexPlayer Debug Log ===";
+        qDebug() << "Log file:" << logPath;
+    }
+    
     QGuiApplication app(argc, argv);
-
-    // Application metadata
+    
     app.setOrganizationName("Nexylius");
     app.setOrganizationDomain("nexylius.com");
     app.setApplicationName("NexPlayer");
     app.setApplicationVersion("1.0.0");
-
-    qDebug() << "=== NexPlayer Starting ===";
-    qDebug() << "Application dir:" << QCoreApplication::applicationDirPath();
-
-    // Check QML folder
-    QString qmlPath = QCoreApplication::applicationDirPath() + "/qml";
-    qDebug() << "QML path:" << qmlPath;
-    qDebug() << "QML folder exists:" << QDir(qmlPath).exists();
-
-    // Create QML engine
+    
+    qDebug() << "Application directory:" << QCoreApplication::applicationDirPath();
+    
     QQmlApplicationEngine engine;
-
+    
     // Add QML import path
+    QString qmlPath = QCoreApplication::applicationDirPath() + "/qml";
     engine.addImportPath(qmlPath);
-
-    qDebug() << "QML Import Paths:";
-    for (const QString &path : engine.importPathList())
-    {
-        qDebug() << "  " << path;
+    
+    qDebug() << "QML import path added:" << qmlPath;
+    qDebug() << "QML folder exists:" << QDir(qmlPath).exists();
+    
+    qDebug() << "All QML import paths:";
+    for (const QString &path : engine.importPathList()) {
+        qDebug() << "  -" << path;
     }
-
-    // Register C++ types with QML
+    
+    // Register types
     qmlRegisterType<PlayerController>("NexPlayer", 1, 0, "PlayerController");
     qmlRegisterType<VideoRenderer>("NexPlayer", 1, 0, "VideoRenderer");
-
-    // Create player controller
+    
     PlayerController playerController;
-
-    // Expose to QML
     engine.rootContext()->setContextProperty("player", &playerController);
-
-// Load main QML file
-#ifdef QML_HOT_RELOAD
-    const QUrl url = QUrl::fromLocalFile(QCoreApplication::applicationDirPath() + "/../qml/main.qml");
-    qDebug() << "🔥 Hot Reload Mode";
-    qDebug() << "Loading from:" << url;
-#else
-    const QUrl url(QStringLiteral("qrc:/main.qml"));
-    qDebug() << "Loading QML from resources:" << url;
-#endif
-
-    // Connect to see if object was created
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app, [url](QObject *obj, const QUrl &objUrl)
-                     {
-        if (!obj && url == objUrl) {
-            qDebug() << "ERROR: Failed to load QML!";
-            QCoreApplication::exit(-1);
-        } else if (obj) {
-            qDebug() << "QML loaded successfully!";
-        } }, Qt::QueuedConnection);
-
-    // Connect to see QML warnings
+    
+    // Connect warnings
     QObject::connect(&engine, &QQmlApplicationEngine::warnings,
-                     [](const QList<QQmlError> &warnings)
-                     {
-                         for (const QQmlError &warning : warnings)
-                         {
-                             qDebug() << "QML Warning:" << warning.toString();
-                         }
-                     });
-
-    qDebug() << "Loading QML...";
+                     [](const QList<QQmlError> &warnings) {
+        qDebug() << "=== QML WARNINGS/ERRORS ===";
+        for (const QQmlError &warning : warnings) {
+            qDebug() << warning.toString();
+        }
+    });
+    
+    const QUrl url(QStringLiteral("qrc:/main.qml"));
+    qDebug() << "Loading QML from:" << url.toString();
+    
     engine.load(url);
-
-    if (engine.rootObjects().isEmpty())
-    {
-        qDebug() << "ERROR: No root objects created!";
+    
+    if (engine.rootObjects().isEmpty()) {
+        qDebug() << "FATAL: No root objects created!";
+        qDebug() << "Check the warnings above for details.";
+        
+        if (logStream) {
+            delete logStream;
+            delete logFile;
+        }
         return -1;
     }
-
-    qDebug() << "Entering event loop...";
-    return app.exec();
+    
+    qDebug() << "SUCCESS: QML loaded, root objects created:" << engine.rootObjects().size();
+    
+    int result = app.exec();
+    
+    // Cleanup
+    if (logStream) {
+        delete logStream;
+        delete logFile;
+    }
+    
+    return result;
 }
