@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-13  # ← Intel runner (macos-latest is now arm64)
     steps:
       - uses: actions/checkout@v4
 
