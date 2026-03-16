@@ -48,11 +48,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          
-          # Debug: See what qml6 packages are available
-          echo "=== Available qml6-module packages ==="
-          apt-cache search qml6-module | sort
-          
           sudo apt install -y \
             qt6-base-dev \
             qt6-declarative-dev \
@@ -73,6 +68,8 @@ jobs:
             qml6-module-qtqml-models \
             qml6-module-qt5compat-graphicaleffects \
             qml6-module-qtmultimedia \
+            qml6-module-qt-labs-settings \
+            qml6-module-qt-labs-folderlistmodel \
             qt6-image-formats-plugins \
             libavcodec-dev \
             libavformat-dev \
