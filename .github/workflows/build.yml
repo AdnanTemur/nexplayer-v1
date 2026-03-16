@@ -54,7 +54,6 @@ jobs:
             qt6-multimedia-dev \
             qt6-5compat-dev \
             qt6-shadertools-dev \
-            qt6-quickeffectmaker-dev \
             libqt6opengl6-dev \
             qml6-module-qtquick \
             qml6-module-qtquick-controls \
@@ -62,7 +61,6 @@ jobs:
             qml6-module-qtquick-window \
             qml6-module-qtquick-templates \
             qml6-module-qtquick-dialogs \
-            qml6-module-qtquick-effects \
             qml6-module-qtqml \
             qml6-module-qtqml-workerscript \
             qml6-module-qtqml-models \
