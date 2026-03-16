@@ -96,9 +96,19 @@ jobs:
 
       - name: Create icon
         run: |
+          sudo apt install -y imagemagick
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
-          # Copy your actual icon instead of generating one
-          cp resources/icon.png AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png
+          
+          # Convert and copy icon to multiple sizes
+          convert resources/icon.png -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png
+          convert resources/icon.png -resize 512x512 AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png
+          
+          # Also copy to root for AppImage
+          cp resources/icon.png AppDir/nexplayer.png
+          
+          # Verify icon exists
+          ls -la AppDir/usr/share/icons/hicolor/*/apps/
 
       - name: Create AppRun wrapper
         run: |
@@ -130,32 +140,16 @@ jobs:
             echo "Copied QML modules"
           fi
           
-          # Verify WorkerScript is in AppDir
-          echo "=== Verifying WorkerScript in AppDir ==="
-          find AppDir -name "*WorkerScript*" || echo "WorkerScript NOT in AppDir"
-          
           export QML_SOURCES_PATHS="$(pwd)/qml"
           export QMAKE=/usr/lib/qt6/bin/qmake
           
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
             --desktop-file=AppDir/usr/share/applications/nexplayer.desktop \
-            --icon-file=AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png \
+            --icon-file=resources/icon.png \
             --appdir=AppDir \
             --plugin=qt \
             --output=appimage
-          
-          # Extract and verify final AppImage contents
-          echo "=== Extracting AppImage to verify contents ==="
-          chmod +x NexPlayer-*.AppImage
-          ./NexPlayer-*.AppImage --appimage-extract
-          
-          echo "=== Checking for WorkerScript in final AppImage ==="
-          find squashfs-root -name "*WorkerScript*" -type d
-          find squashfs-root -name "*WorkerScript*" -type f
-          
-          echo "=== QML modules in final AppImage ==="
-          ls -la squashfs-root/usr/lib/qt6/qml/ || ls -la squashfs-root/usr/qml/ || echo "No QML directory found"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

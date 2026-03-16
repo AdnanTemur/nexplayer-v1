@@ -17,6 +17,7 @@ Item {
         source: root.source
         sourceSize: Qt.size(root.size, root.size)
         fillMode: Image.PreserveAspectFit
+        smooth: true
         visible: false
     }
     
@@ -24,6 +25,7 @@ Item {
         anchors.fill: iconImage
         source: iconImage
         color: root.color
+        cached: true
         
         Behavior on color {
             ColorAnimation { duration: 150 }
