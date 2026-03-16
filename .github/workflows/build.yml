@@ -71,6 +71,7 @@ jobs:
             libavutil-dev \
             libswresample-dev \
             libswscale-dev \
+            imagemagick \
             cmake \
             build-essential
 
@@ -79,6 +80,12 @@ jobs:
           mkdir build && cd build
           cmake ..
           make -j$(nproc)
+
+      - name: Verify icon file exists
+        run: |
+          echo "=== Checking for icon file ==="
+          ls -la resources/
+          file resources/icon.png || echo "Icon file not found!"
 
       - name: Create desktop file
         run: |
@@ -94,21 +101,37 @@ jobs:
           Terminal=false
           EOF
 
-      - name: Create icon
+      - name: Create icon in multiple locations
         run: |
-          sudo apt install -y imagemagick
+          echo "=== Creating icon directories ==="
+          mkdir -p AppDir/usr/share/icons/hicolor/16x16/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/32x32/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/48x48/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/64x64/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
+          mkdir -p AppDir/usr/share/pixmaps
           
-          # Convert and copy icon to multiple sizes
+          echo "=== Converting and copying icons ==="
+          convert resources/icon.png -resize 16x16 AppDir/usr/share/icons/hicolor/16x16/apps/nexplayer.png
+          convert resources/icon.png -resize 32x32 AppDir/usr/share/icons/hicolor/32x32/apps/nexplayer.png
+          convert resources/icon.png -resize 48x48 AppDir/usr/share/icons/hicolor/48x48/apps/nexplayer.png
+          convert resources/icon.png -resize 64x64 AppDir/usr/share/icons/hicolor/64x64/apps/nexplayer.png
+          convert resources/icon.png -resize 128x128 AppDir/usr/share/icons/hicolor/128x128/apps/nexplayer.png
           convert resources/icon.png -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png
           convert resources/icon.png -resize 512x512 AppDir/usr/share/icons/hicolor/512x512/apps/nexplayer.png
           
-          # Also copy to root for AppImage
-          cp resources/icon.png AppDir/nexplayer.png
+          # Copy to pixmaps too
+          cp resources/icon.png AppDir/usr/share/pixmaps/nexplayer.png
           
-          # Verify icon exists
+          # Copy to AppDir root
+          cp resources/icon.png AppDir/nexplayer.png
+          cp resources/icon.png AppDir/.DirIcon
+          
+          echo "=== Verifying icon files created ==="
           ls -la AppDir/usr/share/icons/hicolor/*/apps/
+          ls -la AppDir/*.png
 
       - name: Create AppRun wrapper
         run: |
@@ -118,6 +141,11 @@ jobs:
           export QML2_IMPORT_PATH="$APPDIR/usr/lib/qt6/qml:$APPDIR/usr/qml"
           export QML_IMPORT_PATH="$APPDIR/usr/lib/qt6/qml:$APPDIR/usr/qml"
           export LD_LIBRARY_PATH="$APPDIR/usr/lib:$LD_LIBRARY_PATH"
+          
+          # Debug: Print environment
+          echo "QML paths: $QML2_IMPORT_PATH"
+          echo "Starting NexPlayer..."
+          
           exec "$APPDIR/usr/bin/NexPlayer" "$@"
           EOF
           chmod +x AppDir/AppRun
@@ -131,6 +159,10 @@ jobs:
           # Find Qt QML path
           QML_PATH=$(find /usr/lib -type d -name "qml" -path "*/qt6/*" 2>/dev/null | head -1)
           echo "=== Qt QML path: $QML_PATH ==="
+          
+          # Check Qt5Compat.GraphicalEffects specifically
+          echo "=== Checking for GraphicalEffects plugin ==="
+          find "$QML_PATH" -name "*graphicaleffects*" -o -name "*GraphicalEffects*"
           
           # Manually copy ALL Qt QML modules
           echo "=== Copying Qt QML modules to AppDir ==="
@@ -146,10 +178,20 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --executable=build/NexPlayer \
             --desktop-file=AppDir/usr/share/applications/nexplayer.desktop \
-            --icon-file=resources/icon.png \
+            --icon-file=AppDir/usr/share/icons/hicolor/256x256/apps/nexplayer.png \
             --appdir=AppDir \
             --plugin=qt \
             --output=appimage
+          
+          # Verify icons in final AppImage
+          echo "=== Checking AppImage icon ==="
+          ./NexPlayer-*.AppImage --appimage-extract
+          ls -la squashfs-root/*.png || echo "No icon in root"
+          ls -la squashfs-root/usr/share/icons/hicolor/*/apps/ || echo "No icons in hicolor"
+          
+          # Check if GraphicalEffects made it
+          echo "=== Checking GraphicalEffects in AppImage ==="
+          find squashfs-root -name "*ColorOverlay*" -o -name "*graphicaleffects*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
